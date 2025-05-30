@@ -150,6 +150,7 @@ const processIncomingMessagePayload = async (event, req) => {
 
     // Process unfurled links
     let unfurledContent = '';
+    console.log("Checking for URL unfurls in the message : ", unfurledLinks);
     if (unfurledLinks.length > 0) {
         console.log('Processing unfurled links:', unfurledLinks);
         for (const link of unfurledLinks) {
