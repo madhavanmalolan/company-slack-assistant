@@ -283,6 +283,23 @@ router.post('/', async (req, res) => {
         const event = req.body.event;
 
         switch (event.type) {
+            case 'link_shared':
+                console.log('Link shared event received:', event);
+                // Process the shared link
+                try {
+                    const storable = `
+                        Sender : ${event.user}
+                        Channel : ${event.channel}
+                        Shared Link: ${event.links[0].url}
+                        Title: ${event.links[0].title || 'No title'}
+                        Description: ${event.links[0].description || 'No description'}
+                    `;
+                    await storeMessage(event.channel, event.message_ts, storable);
+                } catch (error) {
+                    console.error('Error processing shared link:', error);
+                }
+                return;
+
             case 'member_joined_channel':
             case 'group_joined':
                 if (event.user === req.body.authorizations[0].user_id) {
