@@ -144,6 +144,7 @@ async function processGoogleDriveLink(url) {
             console.log(content);
             return content;
         } catch (error) {
+            console.log("Error processing Google Drive link : ", error);
             if (error.code === 404) {
                 return 'File not found or not accessible. Please check the file permissions in Google Drive.';
             }
