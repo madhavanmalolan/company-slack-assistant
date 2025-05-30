@@ -23,6 +23,7 @@
     "openai": "^5.0.1",
     "pg": "^8.16.0",
     "pgvector": "^0.2.1",
+    "playwright": "^1.52.0",
     "puppeteer": "^24.9.0"
   }
 }

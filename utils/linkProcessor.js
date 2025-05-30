@@ -1,5 +1,5 @@
 const { Client } = require('@notionhq/client');
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
 const { google } = require('googleapis');
 const { marked } = require('marked');
 const cheerio = require('cheerio');
@@ -41,11 +41,13 @@ async function processNotionLink(url) {
                 // Process image with OpenAI
                 const imageUrl = block.image.file?.url || block.image.external?.url;
                 if (imageUrl) {
-                    const browser = await puppeteer.launch({ headless: 'new' });
-                    const page = await browser.newPage();
+                    const browser = await chromium.launch();
+                    const context = await browser.newContext();
+                    const page = await context.newPage();
                     await page.goto(imageUrl);
                     // Wait for 3 seconds to ensure image loads
-                    await new Promise(resolve => setTimeout(resolve, 3000));                     
+                    await page.waitForTimeout(3000);
+                    
                     // Get the image element and convert to base64
                     const base64Image = await page.evaluate(async () => {
                         const img = document.querySelector('img');
@@ -114,9 +116,10 @@ async function processGoogleDriveLink(url) {
 // Process external website links
 async function processExternalLink(url) {
     try {
-        const browser = await puppeteer.launch({ headless: 'new' });
-        const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle0' });
+        const browser = await chromium.launch();
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await page.goto(url, { waitUntil: 'networkidle' });
         
         // Find the section with highest text density
         const content = await page.evaluate(() => {

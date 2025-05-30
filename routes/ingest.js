@@ -119,7 +119,7 @@ const processIncomingMessagePayload = async (event, req) => {
 
     // Get user info
     const userInfo = await slack.users.info({ user: userId });
-    const senderName = userInfo.user.real_name || userInfo.user.name;
+    const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
     const senderTitle = userInfo.user.profile.title || 'No title';
     const senderEmail = userInfo.user.profile.email;
 
@@ -259,14 +259,18 @@ router.post('/', async (req, res) => {
                         });
 
                         for (const message of result.messages) {
-                            console.log('Processing message:', message.text);
-                            await processMessage(
-                                message,
-                                event.channel,
-                                channelInfo.channel.name,
-                                channelInfo.channel.purpose?.value || 'No description',
-                                channelInfo.channel.topic?.value || 'No topic'
-                            );
+                            try {
+                                console.log('Processing message:', message.text);
+                                await processMessage(
+                                    message,
+                                    event.channel,
+                                    channelInfo.channel.name,
+                                    channelInfo.channel.purpose?.value || 'No description',
+                                    channelInfo.channel.topic?.value || 'No topic'
+                                );                                    
+                            } catch (error) {
+                                console.error('Error processing message:', error);
+                            }
                             processedCount++;
                         }
 
@@ -274,6 +278,12 @@ router.post('/', async (req, res) => {
                     } while (cursor && processedCount < 500);
 
                     console.log(`Processed ${processedCount} historical messages`);
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        text: `OK! I have learnt all there is to learn from this channel! Ask me anything by tagging me!`
+                    });
+
+
                 }
                 return;
 
@@ -333,8 +343,6 @@ router.post('/', async (req, res) => {
                         channel: event.channel,
                         thread_ts: event.ts,
                         text: `${response.content[0].text}
-                        \n\n
-                        ${relevantMessages.map(message => `${process.env.SLACK_BASE_URI}/${message.channel_name}/${message.thread_ts} : ${message.similarity}`).join('\n')}
                         `
                     });
 
