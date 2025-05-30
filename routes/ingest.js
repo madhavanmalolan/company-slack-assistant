@@ -426,6 +426,7 @@ router.post('/', async (req, res) => {
                 return;
 
             default:
+                console.log("Processing incoming message payload : ", JSON.stringify(event));
                 const storable = await processIncomingMessagePayload(event, req);
                 await storeMessage(channelId, threadTs, storable);        
         }
