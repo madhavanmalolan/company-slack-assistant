@@ -85,6 +85,7 @@ async function processNotionLink(url) {
 
 // Process Google Drive links
 async function processGoogleDriveLink(url) {
+    console.log("Processing Google Drive link : ", url);
     try {
         // Extract file ID using more robust regex
         const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/) || 
@@ -103,7 +104,8 @@ async function processGoogleDriveLink(url) {
                 fields: 'mimeType, name, description',
                 supportsAllDrives: true
             });
-            
+            console.log("Got file : " , file.data.mimeType);
+
             let content = '';
             switch (file.data.mimeType) {
                 case 'application/vnd.google-apps.document':
@@ -274,6 +276,7 @@ async function generateSummary(content) {
 async function processLink(url) {
     try {
         let content;
+        console.log("Processing url : ", url);
         
         if (url.includes('notion.so')) {
             content = await processNotionLink(url);
