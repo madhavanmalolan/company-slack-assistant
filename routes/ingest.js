@@ -224,6 +224,7 @@ const processIncomingMessagePayload = async (event, req) => {
     `;
 
     // Process any links in the message
+    console.log("Checking for URL unfurls in the message : ", req.body.event.attachments);
     if (req.body.event.attachments) {
         for (const attachment of req.body.event.attachments) {
             if (attachment.is_url_unfurl) {
