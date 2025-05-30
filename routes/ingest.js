@@ -224,6 +224,20 @@ const processIncomingMessagePayload = async (event, req) => {
     `;
 
     // Process any links in the message
+    if (req.body.event.attachments) {
+        for (const attachment of req.body.event.attachments) {
+            if (attachment.is_url_unfurl) {
+                threadContent += `
+                    --------------------------------
+                    URL Preview:
+                    Title: ${attachment.title || ''}
+                    Text: ${attachment.text || ''}
+                    Description: ${attachment.fallback || ''}
+                `;
+            }
+        }
+    }
+
     const links = extractLinks(messageText);
     if (links.length > 0) {
         for (const link of links) {
