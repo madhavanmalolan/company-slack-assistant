@@ -158,6 +158,7 @@ async function processGoogleDriveLink(url) {
 
 // Process external website links
 async function processExternalLink(url) {
+    return url;
     try {
         const browser = await chromium.launch();
         const context = await browser.newContext();
