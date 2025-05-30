@@ -45,6 +45,22 @@ async function processMessage(message, channelId, channelName, channelDescriptio
                 const threadSenderName = threadUserInfo.user.real_name || threadUserInfo.user.name;
                 const threadSenderTitle = threadUserInfo.user.profile.title || 'No title';
 
+                // Check for URL unfurls in the message
+                if (threadMessage.attachments) {
+                    for (const attachment of threadMessage.attachments) {
+                        if (attachment.is_url_unfurl) {
+                            threadContent += `
+                                --------------------------------
+                                URL Preview:
+                                Title: ${attachment.title || ''}
+                                Text: ${attachment.text || ''}
+                                Description: ${attachment.fallback || ''}
+                            `;
+                        }
+                    }
+                }
+
+
                 threadContent += `
                     --------------------------------
                     ${threadContent ? 'Reply from' : 'Message from'}: ${threadSenderName}
@@ -102,6 +118,8 @@ async function processMessage(message, channelId, channelName, channelDescriptio
                 }
             }
         }
+
+        console.log("Storing message : ", storable);
 
         await storeMessage(channelId, message.thread_ts || message.ts, storable);
         return storable;
