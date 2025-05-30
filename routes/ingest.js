@@ -243,6 +243,7 @@ const processIncomingMessagePayload = async (event, req) => {
     if (links.length > 0) {
         for (const link of links) {
             try {
+                console.log("Processing link2 : ", link);
                 const { content, summary } = await processLink(link);
                 storable += `
                     --------------------------------
