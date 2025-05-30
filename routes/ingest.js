@@ -174,6 +174,23 @@ const processIncomingMessagePayload = async (event, req) => {
                 ${message.text}
             `;
             
+
+            // Check for URL unfurls in the message
+            if (message.attachments) {
+                for (const attachment of message.attachments) {
+                    if (attachment.is_url_unfurl) {
+                        threadContent += `
+                            --------------------------------
+                            URL Preview:
+                            Title: ${attachment.title || ''}
+                            Text: ${attachment.text || ''}
+                            Description: ${attachment.fallback || ''}
+                        `;
+                    }
+                }
+            }
+            
+
             // Process any links in the reply
             const replyLinks = extractLinks(message.text);
             if (replyLinks.length > 0) {
