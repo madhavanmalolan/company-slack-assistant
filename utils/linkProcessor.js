@@ -139,6 +139,7 @@ async function processGoogleDriveLink(url) {
                     content += `Type: ${file.data.mimeType}\n`;
                     content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
             }
+            console.log(content);
             return content;
         } catch (error) {
             if (error.code === 404) {
