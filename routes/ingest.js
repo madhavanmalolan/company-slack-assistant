@@ -134,6 +134,7 @@ const processIncomingMessagePayload = async (event, req) => {
     const channelId = req.body.event.channel;
     const threadTs = req.body.event.thread_ts || req.body.event.ts;
     const userId = req.body.event.user;
+    const unfurledLinks = req.body.event.links || [];
 
     // Get user info
     const userInfo = await slack.users.info({ user: userId });
@@ -146,6 +147,33 @@ const processIncomingMessagePayload = async (event, req) => {
     const channelName = channelInfo.channel.name;
     const channelDescription = channelInfo.channel.purpose?.value || 'No description';
     const channelTopic = channelInfo.channel.topic?.value || 'No topic';
+
+    // Process unfurled links
+    let unfurledContent = '';
+    if (unfurledLinks.length > 0) {
+        console.log('Processing unfurled links:', unfurledLinks);
+        for (const link of unfurledLinks) {
+            try {
+                const { content, summary } = await processLink(link.url);
+                unfurledContent += `
+                    --------------------------------
+                    Unfurled Link: ${link.url}
+                    Title: ${link.title || 'No title'}
+                    Description: ${link.description || 'No description'}
+                    --------------------------------
+                    Summary: ${summary}
+                    Content: ${content}
+                `;
+            } catch (error) {
+                console.error('Error processing unfurled link:', error);
+                unfurledContent += `
+                    --------------------------------
+                    Failed to process unfurled link: ${link.url}
+                    Error: ${error.message}
+                `;
+            }
+        }
+    }
 
     // Get thread info if it exists
     let threadContent = '';
@@ -167,31 +195,14 @@ const processIncomingMessagePayload = async (event, req) => {
             const threadSenderName = threadUserInfo.user.real_name || threadUserInfo.user.name;
             const threadSenderTitle = threadUserInfo.user.profile.title || 'No title';
             
-            threadContent += `                            --------------------------------
+            threadContent += `
+                --------------------------------
                 ${threadContent ? 'Reply from' : 'Message from'}: ${threadSenderName}
                 Title: ${threadSenderTitle}
                 
                 ${message.text}
             `;
             
-
-            // Check for URL unfurls in the message
-            console.log("Checking for URL unfurls in the message : ", message.attachments);
-            if (message.attachments) {
-                for (const attachment of message.attachments) {
-                    if (attachment.is_url_unfurl) {
-                        threadContent += `
-                            --------------------------------
-                            URL Preview:
-                            Title: ${attachment.title || ''}
-                            Text: ${attachment.text || ''}
-                            Description: ${attachment.fallback || ''}
-                        `;
-                    }
-                }
-            }
-            
-
             // Process any links in the reply
             const replyLinks = extractLinks(message.text);
             if (replyLinks.length > 0) {
@@ -221,29 +232,14 @@ const processIncomingMessagePayload = async (event, req) => {
         Channel Topic : ${channelTopic}
         
         ${threadContent || messageText}
+        ${unfurledContent}
     `;
 
     // Process any links in the message
-    console.log("Checking for URL unfurls in the message : ", req.body.event.attachments);
-    if (req.body.event.attachments) {
-        for (const attachment of req.body.event.attachments) {
-            if (attachment.is_url_unfurl) {
-                threadContent += `
-                    --------------------------------
-                    URL Preview:
-                    Title: ${attachment.title || ''}
-                    Text: ${attachment.text || ''}
-                    Description: ${attachment.fallback || ''}
-                `;
-            }
-        }
-    }
-
     const links = extractLinks(messageText);
     if (links.length > 0) {
         for (const link of links) {
             try {
-                console.log("Processing link2 : ", link);
                 const { content, summary } = await processLink(link);
                 storable += `
                     --------------------------------
@@ -268,10 +264,11 @@ router.post('/', async (req, res) => {
         const channelId = req.body.event.channel;
         const threadTs = req.body.event.thread_ts || req.body.event.ts;
         const userId = req.body.event.user;
+        const unfurledLinks = req.body.event.links || [];
     
         // Get user info
         const userInfo = await slack.users.info({ user: userId });
-        const senderName = userInfo.user.real_name || userInfo.user.name;
+        const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
         const senderTitle = userInfo.user.profile.title || 'No title';
         const senderEmail = userInfo.user.profile.email;
     
