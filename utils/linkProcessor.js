@@ -22,7 +22,7 @@ function extractLinks(text) {
     if(!text) {
         return [];
     }
-    const urlRegex = /(https?:\/\/[0-9a-zA-Z\-\.\/]+)/g;
+    const urlRegex = /(https?:\/\/[0-9a-zA-Z\-\.\/\_]+)/g;
     return text.match(urlRegex) || [];
 }
 
