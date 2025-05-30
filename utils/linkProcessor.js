@@ -86,30 +86,69 @@ async function processNotionLink(url) {
 // Process Google Drive links
 async function processGoogleDriveLink(url) {
     try {
-        const fileId = url.match(/\/d\/(.*?)(\/|$)/)[1];
-        const file = await drive.files.get({ fileId, fields: 'mimeType' });
+        // Extract file ID using more robust regex
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/) || 
+                          url.match(/id=([a-zA-Z0-9-_]+)/) ||
+                          url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
         
-        let content = '';
-        switch (file.data.mimeType) {
-            case 'application/vnd.google-apps.document':
-                const doc = await drive.files.export({ fileId, mimeType: 'text/plain' });
-                content = doc.data;
-                break;
-            case 'application/vnd.google-apps.spreadsheet':
-                const sheet = await drive.files.export({ fileId, mimeType: 'text/csv' });
-                content = sheet.data;
-                break;
-            case 'application/vnd.google-apps.presentation':
-                const slides = await drive.files.export({ fileId, mimeType: 'text/plain' });
-                content = slides.data;
-                break;
-            default:
-                throw new Error('Unsupported Google Drive file type');
+        if (!fileIdMatch) {
+            throw new Error('Could not extract file ID from Google Drive URL');
         }
-        return content;
+        
+        const fileId = fileIdMatch[1];
+        
+        try {
+            const file = await drive.files.get({ 
+                fileId, 
+                fields: 'mimeType, name, description',
+                supportsAllDrives: true
+            });
+            
+            let content = '';
+            switch (file.data.mimeType) {
+                case 'application/vnd.google-apps.document':
+                    const doc = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = doc.data;
+                    break;
+                case 'application/vnd.google-apps.spreadsheet':
+                    const sheet = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/csv',
+                        supportsAllDrives: true
+                    });
+                    content = sheet.data;
+                    break;
+                case 'application/vnd.google-apps.presentation':
+                    const slides = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = slides.data;
+                    break;
+                default:
+                    // For non-Google Workspace files, try to get the file name and description
+                    content = `File Name: ${file.data.name}\n`;
+                    if (file.data.description) {
+                        content += `Description: ${file.data.description}\n`;
+                    }
+                    content += `Type: ${file.data.mimeType}\n`;
+                    content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
+            }
+            return content;
+        } catch (error) {
+            if (error.code === 404) {
+                return 'File not found or not accessible. Please check the file permissions in Google Drive.';
+            }
+            throw error;
+        }
     } catch (error) {
         console.error('Error processing Google Drive link:', error);
-        throw error;
+        return 'Unable to process Google Drive link. Please ensure the file is accessible and the link is correct.';
     }
 }
 
