@@ -291,16 +291,10 @@ router.post('/', async (req, res) => {
 
             default:
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
-                // Skip if message is from bot or mentions the bot
-                if (event.user === process.env.SLACK_BOT_ID || 
-                    (event.text && event.text.includes(`<@${process.env.SLACK_BOT_ID}>`))) {
-                    console.log("Skipping bot message or message mentioning bot");
-                    return;
-                }
 
                 // Process links in the message
                 const links = extractLinks(event.text);
-                if (links.length > 0) {
+                if (links.length > 0 && event.user !== process.env.SLACK_BOT_ID) {
                     let summaryText = "Here's a summary of the links in your message:\n\n";
                     
                     for (const link of links) {
