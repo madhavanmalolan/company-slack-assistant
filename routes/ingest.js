@@ -315,6 +315,8 @@ router.post('/', async (req, res) => {
                     });
                 }
 
+                event.text = event.text + "\n\n" + summaryText;
+
                 const storable = await processIncomingMessagePayload(event, req);
                 // Get user info
                 const userInfo = await slack.users.info({ user: event.user });
