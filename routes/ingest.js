@@ -212,11 +212,11 @@ router.post('/', async (req, res) => {
                 return;
 
             case 'app_mention':
-                await slack.reactions.add({
+                /*await slack.reactions.add({
                     channel: event.channel,
                     timestamp: event.ts,
                     name: 'eyes'
-                });
+                });*/
                 const taggedMessage = await processIncomingMessagePayload(event, req);
                 const similarMessages = await searchSimilarMessages(taggedMessage, 20);
                 // Get all messages in the thread
