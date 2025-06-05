@@ -24,6 +24,9 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: 'v3', auth });
 
+// Initialize Slack Web API client
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+
 // Helper function to extract links from text
 function extractLinks(text) {
     if(!text) {
@@ -464,8 +467,22 @@ async function generateSummary(content) {
 // Process image with Claude Vision
 async function processImage(url) {
     try {
-        // Download the image
-        const imageResponse = await fetch(url, {
+        console.log('Processing image URL:', url);
+        
+        // Download the image using Slack Web API
+        const fileResponse = await slack.files.info({
+            file: url.split('/').pop() // Get file ID from URL
+        });
+
+        console.log('File info:', {
+            id: fileResponse.file.id,
+            name: fileResponse.file.name,
+            mimetype: fileResponse.file.mimetype,
+            url: fileResponse.file.url_private_download
+        });
+
+        // Download the file content
+        const imageResponse = await fetch(fileResponse.file.url_private_download, {
             headers: {
                 'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
             }
@@ -476,6 +493,7 @@ async function processImage(url) {
         }
 
         const imageBuffer = await imageResponse.buffer();
+        console.log('Downloaded image buffer size:', imageBuffer.length);
         
         // Get the content type from the response
         const contentType = imageResponse.headers.get('content-type');
@@ -491,6 +509,7 @@ async function processImage(url) {
                     withoutEnlargement: true
                 })
                 .toBuffer();
+            console.log('Successfully processed image with sharp');
         } catch (sharpError) {
             console.error('Sharp processing error:', sharpError);
             
@@ -504,6 +523,7 @@ async function processImage(url) {
         }
 
         const base64Image = processedImageBuffer.toString('base64');
+        console.log('Base64 image length:', base64Image.length);
 
         // Get image description from Claude
         const claudeResponse = await anthropic.messages.create({
