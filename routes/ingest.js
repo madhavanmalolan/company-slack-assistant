@@ -134,6 +134,7 @@ router.post('/', async (req, res) => {
         const threadTs = req.body.event.thread_ts || req.body.event.ts;
         const userId = req.body.event.user;
         const unfurledLinks = req.body.event.links || [];
+        
 
         // Get user info
         const userInfo = await slack.users.info({ user: userId });
@@ -149,13 +150,13 @@ router.post('/', async (req, res) => {
 
         const event = req.body.event;
 
+        console.log('Processing event:', event.type);
         switch (event.type) {
             case 'member_joined_channel':
             case 'group_joined':
                 if (event.user === req.body.authorizations[0].user_id) {
                     // Bot was added to a channel
                     const channelInfo = await slack.conversations.info({ channel: event.channel });
-                    console.log(`Bot was added to channel: ${channelInfo.channel.name}`);
                     
                     // Send welcome message
                     await slack.chat.postMessage({
@@ -177,7 +178,7 @@ router.post('/', async (req, res) => {
 
                         for (const message of result.messages) {
                             try {
-                                console.log('Processing message:', message.text);
+                                console.log('Processing message:', message.text.substring(0, 40));
                                 await processMessage(
                                     message,
                                     event.channel,
@@ -205,14 +206,11 @@ router.post('/', async (req, res) => {
             case 'group_left':
             case 'member_left_channel':
             case 'channel_left':
-                console.log('Bot was removed from channel:', event.channel);
                 const deleted = await deleteChannelMessages(event.channel);
                 console.log(`Deleted ${deleted} messages from channel: ${event.channel}`);
                 return;
 
             case 'app_mention':
-                console.log('Bot was mentioned in channel:', event.channel);
-                // Add eyes emoji reaction to show the bot is processing
                 await slack.reactions.add({
                     channel: event.channel,
                     timestamp: event.ts,
