@@ -8,8 +8,11 @@ const { OpenAI } = require('openai');
 const { chromium } = require('playwright');
 const { aboutReclaimShort } = require('../utils/contextText');
 
-// Initialize Slack Web API client
+// Initialize clients
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
+const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 // Shared function to process message content
 async function processMessageContent(message, channelId, channelName, channelDescription, channelTopic) {
@@ -409,6 +412,33 @@ router.post('/', async (req, res) => {
 
             default:
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
+
+                // Process files in the message
+                if (event.files && event.user !== process.env.SLACK_BOT_ID) {
+                    let fileSummaryText = "Here's a summary of the files in your message:\n\n";
+                    
+                    for (const file of event.files) {
+                        try {
+                            if (file.mimetype.startsWith('image/')) {
+                                const { content, summary } = await processImage(file.url_private_download);
+                                fileSummaryText += `*Image: ${file.name}*\n${summary}\n\n`;
+                            } else if (file.mimetype === 'application/pdf') {
+                                const { content, summary } = await processPDF(file.url_private_download);
+                                fileSummaryText += `*PDF: ${file.name}*\n${summary}\n\n`;
+                            }
+                        } catch (error) {
+                            console.error(`Error processing file ${file.name}:`, error);
+                            fileSummaryText += `*${file.name}*\nSorry, I couldn't process this file.\n\n`;
+                        }
+                    }
+
+                    // Send the file summary as a thread reply with formatting
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        thread_ts: event.ts,
+                        blocks: formatMessageWithBlocks(fileSummaryText)
+                    });
+                }
 
                 // Process links in the message
                 let summaryText = "";
