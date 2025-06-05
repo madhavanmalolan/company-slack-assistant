@@ -207,7 +207,7 @@ async function searchSimilarMessages(queryText, limit = 5, minSimilarity = 0.7, 
         }
         
         const embedding = await generateEmbedding(queryText);
-        params.push(`[${embedding.join(',')}]`, limit, minSimilarity);
+        params.push(`[${embedding.join(',')}]`, limit);
         
         const sqlQuery = `
             WITH ranked_messages AS (
@@ -219,11 +219,11 @@ async function searchSimilarMessages(queryText, limit = 5, minSimilarity = 0.7, 
                     user_title,
                     chunk_index,
                     metadata,
-                    1 - (embedding <=> $${params.length - 2}::vector) as similarity,
-                    ROW_NUMBER() OVER (PARTITION BY thread_ts ORDER BY 1 - (embedding <=> $${params.length - 2}::vector) DESC) as rank
+                    1 - (embedding <=> $${params.length - 1}::vector) as similarity,
+                    ROW_NUMBER() OVER (PARTITION BY thread_ts ORDER BY 1 - (embedding <=> $${params.length - 1}::vector) DESC) as rank
                 FROM messages
                 ${whereClause}
-                AND 1 - (embedding <=> $${params.length - 2}::vector) > $${params.length - 1}::float
+                AND 1 - (embedding <=> $${params.length - 1}::vector) > ${minSimilarity}
             )
             SELECT * FROM ranked_messages
             WHERE rank = 1
