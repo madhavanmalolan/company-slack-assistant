@@ -80,6 +80,12 @@ function estimateTokens(text) {
 
 // Function to split text into chunks
 function splitIntoChunks(text, maxTokens) {
+    // Handle null or undefined text
+    if (!text) {
+        console.warn('Received null or undefined text in splitIntoChunks');
+        return [];  // Return empty array instead of trying to split null
+    }
+
     // Split text into sentences
     const sentences = text.split(/[.!?]+/);
     const chunks = [];

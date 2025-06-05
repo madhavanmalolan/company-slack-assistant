@@ -319,11 +319,13 @@ router.post('/', async (req, res) => {
                 event.text = event.text + "\n\n" + summaryText;
 
                 const storable = await processIncomingMessagePayload(event, req);
-                // Get user info
-                const userInfo = await slack.users.info({ user: event.user });
-                const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
-                const senderTitle = userInfo.user.profile.title || 'No title';
-                await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);
+                if (storable) {  // Only process if we have content to store
+                    // Get user info
+                    const userInfo = await slack.users.info({ user: event.user });
+                    const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
+                    const senderTitle = userInfo.user.profile.title || 'No title';
+                    await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);
+                }
         }
     } catch (error) {
         console.error('Error processing Slack message:', error);
