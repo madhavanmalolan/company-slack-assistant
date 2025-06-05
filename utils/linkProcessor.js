@@ -477,14 +477,31 @@ async function processImage(url) {
 
         const imageBuffer = await imageResponse.buffer();
         
-        // Convert image to JPEG format and resize if needed
-        const processedImageBuffer = await sharp(imageBuffer)
-            .jpeg() // Convert to JPEG
-            .resize(1024, 1024, { // Resize to max dimensions
-                fit: 'inside',
-                withoutEnlargement: true
-            })
-            .toBuffer();
+        // Get the content type from the response
+        const contentType = imageResponse.headers.get('content-type');
+        console.log('Image content type:', contentType);
+
+        let processedImageBuffer;
+        try {
+            // Try to process the image with sharp
+            processedImageBuffer = await sharp(imageBuffer)
+                .jpeg() // Convert to JPEG
+                .resize(1024, 1024, { // Resize to max dimensions
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .toBuffer();
+        } catch (sharpError) {
+            console.error('Sharp processing error:', sharpError);
+            
+            // If sharp fails, try to use the original buffer if it's a supported format
+            if (contentType && ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(contentType)) {
+                console.log('Using original image buffer');
+                processedImageBuffer = imageBuffer;
+            } else {
+                throw new Error(`Unsupported image format: ${contentType}`);
+            }
+        }
 
         const base64Image = processedImageBuffer.toString('base64');
 
