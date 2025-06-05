@@ -12,19 +12,13 @@ const {aboutReclaimShort} = require('../utils/contextText');
 // Initialize Slack Web API client
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
 
-// Function to process a single message
-async function processMessage(message, channelId, channelName, channelDescription, channelTopic) {
+// Shared function to process message content
+async function processMessageContent(message, channelId, channelName, channelDescription, channelTopic) {
     try {
         // Skip bot messages
         if (message.user === process.env.SLACK_BOT_ID) {
-            return;
+            return null;
         }
-
-        // Get user info
-        const userInfo = await slack.users.info({ user: message.user });
-        const senderName = userInfo.user.real_name || userInfo.user.name;
-        const senderTitle = userInfo.user.profile.title || 'No title';
-
         // Get thread info if it exists
         let threadContent = '';
         if (message.thread_ts) {
@@ -40,32 +34,8 @@ async function processMessage(message, channelId, channelName, channelDescriptio
                     continue;
                 }
 
-                // Get user info for each message
-                const threadUserInfo = await slack.users.info({ user: threadMessage.user });
-                const threadSenderName = threadUserInfo.user.real_name || threadUserInfo.user.name;
-                const threadSenderTitle = threadUserInfo.user.profile.title || 'No title';
-
-                // Check for URL unfurls in the message
-                if (threadMessage.attachments) {
-                    for (const attachment of threadMessage.attachments) {
-                        if (attachment.is_url_unfurl) {
-                            threadContent += `
-                                --------------------------------
-                                URL Preview:
-                                Title: ${attachment.title || ''}
-                                Text: ${attachment.text || ''}
-                                Description: ${attachment.fallback || ''}
-                            `;
-                        }
-                    }
-                }
-
-
                 threadContent += `
                     --------------------------------
-                    ${threadContent ? 'Reply from' : 'Message from'}: ${threadSenderName}
-                    Title: ${threadSenderTitle}
-                    
                     ${threadMessage.text}
                 `;
 
@@ -90,13 +60,7 @@ async function processMessage(message, channelId, channelName, channelDescriptio
             }
         }
 
-        let storable = `
-            Sender : ${senderName}
-            Title : ${senderTitle}
-            Channel : ${channelName}
-            Channel Description : ${channelDescription}
-            Channel Topic : ${channelTopic}
-            
+        let storable = `            
             ${threadContent || message.text}
         `;
 
@@ -119,28 +83,31 @@ async function processMessage(message, channelId, channelName, channelDescriptio
             }
         }
 
-        console.log("Storing message : ", storable);
-
-        await storeMessage(channelId, message.thread_ts || message.ts, storable);
         return storable;
     } catch (error) {
-        console.error('Error processing historical message:', error);
+        console.error('Error processing message content:', error);
+        return null;
     }
 }
 
-const processIncomingMessagePayload = async (event, req) => {
-    console.log('Unhandled event type:', event.type);
-    const messageText = req.body.event.text;
-    const channelId = req.body.event.channel;
-    const threadTs = req.body.event.thread_ts || req.body.event.ts;
-    const userId = req.body.event.user;
-    const unfurledLinks = req.body.event.links || [];
+// Function to process a single message (for historical messages)
+async function processMessage(message, channelId, channelName, channelDescription, channelTopic) {
+    const storable = await processMessageContent(message, channelId, channelName, channelDescription, channelTopic);
+    if (storable) {
+        // Get user info
+        const userInfo = await slack.users.info({ user: message.user });
+        const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : message.user;
+        const senderTitle = userInfo.user.profile.title || 'No title';
+        await storeMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle);
+    }
+}
 
-    // Get user info
-    const userInfo = await slack.users.info({ user: userId });
-    const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
-    const senderTitle = userInfo.user.profile.title || 'No title';
-    const senderEmail = userInfo.user.profile.email;
+// Function to process incoming message payload
+const processIncomingMessagePayload = async (event, req) => {
+    const messageText = event.text;
+    const channelId = event.channel;
+    const threadTs = event.thread_ts || event.ts;
+    const userId = event.user;
 
     // Get channel info
     const channelInfo = await slack.conversations.info({ channel: channelId });
@@ -148,114 +115,15 @@ const processIncomingMessagePayload = async (event, req) => {
     const channelDescription = channelInfo.channel.purpose?.value || 'No description';
     const channelTopic = channelInfo.channel.topic?.value || 'No topic';
 
-    // Process unfurled links
-    let unfurledContent = '';
-    console.log("Checking for URL unfurls in the message : ", unfurledLinks);
-    if (unfurledLinks.length > 0) {
-        console.log('Processing unfurled links:', unfurledLinks);
-        for (const link of unfurledLinks) {
-            try {
-                const { content, summary } = await processLink(link.url);
-                unfurledContent += `
-                    --------------------------------
-                    Unfurled Link: ${link.url}
-                    Title: ${link.title || 'No title'}
-                    Description: ${link.description || 'No description'}
-                    --------------------------------
-                    Summary: ${summary}
-                    Content: ${content}
-                `;
-            } catch (error) {
-                console.error('Error processing unfurled link:', error);
-                unfurledContent += `
-                    --------------------------------
-                    Failed to process unfurled link: ${link.url}
-                    Error: ${error.message}
-                `;
-            }
-        }
-    }
+    const message = {
+        text: messageText,
+        user: userId,
+        thread_ts: threadTs,
+        ts: event.ts
+    };
 
-    // Get thread info if it exists
-    let threadContent = '';
-    if (threadTs !== req.body.event.ts) {
-        const threadResponse = await slack.conversations.replies({
-            channel: channelId,
-            ts: threadTs
-        });
-        
-        // Process all messages in the thread
-        for (const message of threadResponse.messages) {
-            // Skip bot messages
-            if (message.user === req.body.authorizations[0].user_id) {
-                continue;
-            }
-            
-            // Get user info for each message
-            const threadUserInfo = await slack.users.info({ user: message.user });
-            const threadSenderName = threadUserInfo.user.real_name || threadUserInfo.user.name;
-            const threadSenderTitle = threadUserInfo.user.profile.title || 'No title';
-            
-            threadContent += `
-                --------------------------------
-                ${threadContent ? 'Reply from' : 'Message from'}: ${threadSenderName}
-                Title: ${threadSenderTitle}
-                
-                ${message.text}
-            `;
-            
-            // Process any links in the reply
-            const replyLinks = extractLinks(message.text);
-            if (replyLinks.length > 0) {
-                for (const link of replyLinks) {
-                    try {
-                        const { content, summary } = await processLink(link);
-                        threadContent += `
-                            --------------------------------
-                            Contents of Link : ${link}
-                            --------------------------------
-                            Summary : ${summary}
-                            Content : ${content}
-                        `;
-                    } catch (error) {
-                        console.error(`Error processing link ${link}:`, error);
-                    }
-                }
-            }
-        }
-    }
-
-    let storable = `
-        Sender : ${senderName}
-        Title : ${senderTitle}
-        Channel : ${channelName}
-        Channel Description : ${channelDescription}
-        Channel Topic : ${channelTopic}
-        
-        ${threadContent || messageText}
-        ${unfurledContent}
-    `;
-
-    // Process any links in the message
-    const links = extractLinks(messageText);
-    if (links.length > 0) {
-        for (const link of links) {
-            try {
-                const { content, summary } = await processLink(link);
-                storable += `
-                    --------------------------------
-                    Contents of Link : ${link}
-                    --------------------------------
-                    Summary : ${summary}
-                    Content : ${content}
-                `;
-            } catch (error) {
-                console.error(`Error processing link ${link}:`, error);
-            }
-        }
-    }
-    return storable;
-}
+    return await processMessageContent(message, channelId, channelName, channelDescription, channelTopic);
+};
 
 // Endpoint to handle Slack messages
 router.post('/', async (req, res) => {
@@ -266,40 +134,22 @@ router.post('/', async (req, res) => {
         const threadTs = req.body.event.thread_ts || req.body.event.ts;
         const userId = req.body.event.user;
         const unfurledLinks = req.body.event.links || [];
-    
+
         // Get user info
         const userInfo = await slack.users.info({ user: userId });
         const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
         const senderTitle = userInfo.user.profile.title || 'No title';
         const senderEmail = userInfo.user.profile.email;
-    
+
         // Get channel info
         const channelInfo = await slack.conversations.info({ channel: channelId });
         const channelName = channelInfo.channel.name;
         const channelDescription = channelInfo.channel.purpose?.value || 'No description';
         const channelTopic = channelInfo.channel.topic?.value || 'No topic';
-    
-        
+
         const event = req.body.event;
 
         switch (event.type) {
-            case 'link_shared':
-                console.log('Link shared event received:', event);
-                // Process the shared link
-                try {
-                    const storable = `
-                        Sender : ${event.user}
-                        Channel : ${event.channel}
-                        Shared Link: ${event.links[0].url}
-                        Title: ${event.links[0].title || 'No title'}
-                        Description: ${event.links[0].description || 'No description'}
-                    `;
-                    await storeMessage(event.channel, event.message_ts, storable);
-                } catch (error) {
-                    console.error('Error processing shared link:', error);
-                }
-                return;
-
             case 'member_joined_channel':
             case 'group_joined':
                 if (event.user === req.body.authorizations[0].user_id) {
@@ -334,7 +184,7 @@ router.post('/', async (req, res) => {
                                     channelInfo.channel.name,
                                     channelInfo.channel.purpose?.value || 'No description',
                                     channelInfo.channel.topic?.value || 'No topic'
-                                );                                    
+                                );
                             } catch (error) {
                                 console.error('Error processing message:', error);
                             }
@@ -349,8 +199,6 @@ router.post('/', async (req, res) => {
                         channel: event.channel,
                         text: `OK! I have learnt all there is to learn from this channel! Ask me anything by tagging me!`
                     });
-
-
                 }
                 return;
 
@@ -381,14 +229,14 @@ router.post('/', async (req, res) => {
                 const relevantMessages = similarMessages.filter(message => message.similarity > 0.9);
                 // Extract just the message text from each reply
                 const threadText = threadResponse.messages
-                    .map(msg => `Message from ${slack.users.info({ user: msg.user }).user? (slack.users.info({ user: msg.user }).user.real_name || slack.users.info({ user: msg.user }).user.name) : msg.user} : ${msg.text}`)
+                    .map(msg => `Message from ${slack.users.info({ user: msg.user }).user? (slack.users.info({ user: msg.user }).user.real_name || slack.users.info({ user: msg.user }).user.name) : msg.user} (${slack.users.info({ user: msg.user }).user.profile.title || 'No title'}): ${msg.text}`)
                     .join('\n\n');
                 const context = `
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull informatoin from other soruces including the internet : 
                     About the company : 
                     ${aboutReclaimShort}
                     Below are some of the most similar messages that you may use to answer the question : 
-                    ${relevantMessages.map(message => message.content).join('\n')}
+                    ${relevantMessages.map(message => `Message from ${message.senderName} (${message.senderTitle}) : ${message.content}`).join('\n\n')}
                 `;
                 try {
                     // Call Claude API
@@ -428,7 +276,11 @@ router.post('/', async (req, res) => {
             default:
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
                 const storable = await processIncomingMessagePayload(event, req);
-                await storeMessage(channelId, threadTs, storable);        
+                // Get user info
+                const userInfo = await slack.users.info({ user: event.user });
+                const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
+                const senderTitle = userInfo.user.profile.title || 'No title';
+                await storeMessage(channelId, threadTs, storable, senderName, senderTitle);        
         }
     } catch (error) {
         console.error('Error processing Slack message:', error);

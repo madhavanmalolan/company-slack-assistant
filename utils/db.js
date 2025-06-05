@@ -33,6 +33,8 @@ async function createMessagesTable() {
                 channel_name TEXT NOT NULL,
                 thread_ts TEXT NOT NULL,
                 content TEXT NOT NULL,
+                user_name TEXT,
+                user_title TEXT,
                 embedding vector(1536),
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
@@ -66,7 +68,7 @@ async function generateEmbedding(text) {
 }
 
 // Store message with embedding
-async function storeMessage(channelName, threadTs, content) {
+async function storeMessage(channelName, threadTs, content, userName = null, userTitle = null) {
     try {
         const embedding = await generateEmbedding(content);
         
@@ -83,21 +85,21 @@ async function storeMessage(channelName, threadTs, content) {
             // Update existing message
             const query = `
                 UPDATE messages 
-                SET content = $3, embedding = $4::vector, created_at = CURRENT_TIMESTAMP
+                SET content = $3, user_name = $4, user_title = $5, embedding = $6::vector, created_at = CURRENT_TIMESTAMP
                 WHERE channel_name = $1 AND thread_ts = $2
                 RETURNING id;
             `;
-            const result = await pool.query(query, [channelName, threadTs, content, embeddingArray]);
+            const result = await pool.query(query, [channelName, threadTs, content, userName, userTitle, embeddingArray]);
             console.log('Message updated with ID:', result.rows[0].id);
             return result.rows[0].id;
         } else {
             // Insert new message
             const query = `
-                INSERT INTO messages (channel_name, thread_ts, content, embedding)
-                VALUES ($1, $2, $3, $4::vector)
+                INSERT INTO messages (channel_name, thread_ts, content, user_name, user_title, embedding)
+                VALUES ($1, $2, $3, $4, $5, $6::vector)
                 RETURNING id;
             `;
-            const result = await pool.query(query, [channelName, threadTs, content, embeddingArray]);
+            const result = await pool.query(query, [channelName, threadTs, content, userName, userTitle, embeddingArray]);
             console.log('Message stored with ID:', result.rows[0].id);
             return result.rows[0].id;
         }
