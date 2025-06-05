@@ -12,9 +12,10 @@ const fetch = require('node-fetch');
 const sharp = require('sharp');
 
 // Initialize clients
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 // Initialize Google Drive client
 const auth = new google.auth.GoogleAuth({
@@ -23,9 +24,6 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const drive = google.drive({ version: 'v3', auth });
-
-// Initialize Slack Web API client
-const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 // Helper function to extract links from text
 function extractLinks(text) {
@@ -469,9 +467,14 @@ async function processImage(url) {
     try {
         console.log('Processing image URL:', url);
         
+        // Extract file ID from the URL
+        const fileId = url.split('/').pop().split('.')[0];
+        console.log('Extracted file ID:', fileId);
+        
         // Download the image using Slack Web API
         const fileResponse = await slack.files.info({
-            file: url.split('/').pop() // Get file ID from URL
+            token: process.env.SLACK_BOT_TOKEN,
+            file: fileId
         });
 
         console.log('File info:', {
