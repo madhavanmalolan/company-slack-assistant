@@ -90,6 +90,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
         let storable = `            
             ${threadContent || message.text}
         `;
+        console.log("Storable after processing images: ", storable);
 
         // Process any files in the message
         if (message.files) {

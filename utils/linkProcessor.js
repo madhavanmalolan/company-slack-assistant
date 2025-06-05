@@ -532,6 +532,7 @@ async function processImage(url) {
         console.log('Base64 image length:', base64Image.length);
 
         // Get image description from Claude
+        console.log("Getting image description from Claude");
         const claudeResponse = await anthropic.messages.create({
             model: "claude-3-5-sonnet-20240620",
             max_tokens: 300,
@@ -555,8 +556,8 @@ async function processImage(url) {
         });
 
         const description = claudeResponse.content[0].text;
-        
         // Generate a concise summary using Claude
+        console.log("Generating summary using Claude");
         const summary = await anthropic.messages.create({
             model: "claude-3-5-sonnet-20240620",
             max_tokens: 100,
@@ -565,7 +566,7 @@ async function processImage(url) {
                 content: `Create a concise one-sentence summary of this image description:\n${description}`
             }]
         });
-
+        console.log("Claude summary : ", summary.content[0].text);
         return {
             content: description,
             summary: summary.content[0].text
