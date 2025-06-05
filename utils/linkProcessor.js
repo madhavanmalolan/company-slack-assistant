@@ -71,7 +71,7 @@ async function processNotionLink(url) {
                             max_tokens: 100,
                             messages: [{
                                 role: "user",
-                                content: `Using the column titles as context, summarize this table row in one concise sentence. Make sure to reference the column titles in your summary:\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
+                                content: `Using the column titles as context, summarize this table row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a table in the Notion page:\nPage: ${page.properties.title?.title[0]?.plain_text || 'Untitled'}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
                             }]
                         });
                         
@@ -172,7 +172,7 @@ async function processNotionLink(url) {
                             max_tokens: 100,
                             messages: [{
                                 role: "user",
-                                content: `Using the property names as context, summarize this database item in one concise sentence. Make sure to reference the property names in your summary:\nProperties: ${propertyNames.join(', ')}\nItem Data: ${JSON.stringify(pageData, null, 2)}`
+                                content: `Using the property names as context, summarize this database item in one concise sentence. Make sure to reference the property names in your summary and mention this is from a database in the Notion page:\nPage: ${page.properties.title?.title[0]?.plain_text || 'Untitled'}\nProperties: ${propertyNames.join(', ')}\nItem Data: ${JSON.stringify(pageData, null, 2)}`
                             }]
                         });
                         
@@ -294,7 +294,7 @@ async function processGoogleDriveLink(url) {
                                     max_tokens: 100,
                                     messages: [{
                                         role: "user",
-                                        content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary:\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
+                                        content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a Google Spreadsheet:\nSpreadsheet: ${file.data.name}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
                                     }]
                                 });
                                 
