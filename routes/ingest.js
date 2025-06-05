@@ -241,6 +241,7 @@ router.post('/', async (req, res) => {
                     }
                 }));
 
+                console.log(relevantMessages.map(message => `Message from ${message.user_name || 'Unknown'} (${message.user_title || 'No title'}) : ${message.content}\n`));
                 const threadText = threadMessages.join('\n\n');
                 const context = `
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull informatoin from other soruces including the internet : 
