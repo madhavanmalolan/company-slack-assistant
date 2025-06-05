@@ -293,9 +293,10 @@ router.post('/', async (req, res) => {
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
 
                 // Process links in the message
+                let summaryText = "";
                 const links = extractLinks(event.text);
                 if (links.length > 0 && event.user !== process.env.SLACK_BOT_ID) {
-                    let summaryText = "Here's a summary of the links in your message:\n\n";
+                    summaryText = "Here's a summary of the links in your message:\n\n";
                     
                     for (const link of links) {
                         try {
