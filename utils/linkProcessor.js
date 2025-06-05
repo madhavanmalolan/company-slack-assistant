@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const { WebClient } = require('@slack/web-api');
 const fetch = require('node-fetch');
+const sharp = require('sharp');
 
 // Initialize clients
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
@@ -475,7 +476,17 @@ async function processImage(url) {
         }
 
         const imageBuffer = await imageResponse.buffer();
-        const base64Image = imageBuffer.toString('base64');
+        
+        // Convert image to JPEG format and resize if needed
+        const processedImageBuffer = await sharp(imageBuffer)
+            .jpeg() // Convert to JPEG
+            .resize(1024, 1024, { // Resize to max dimensions
+                fit: 'inside',
+                withoutEnlargement: true
+            })
+            .toBuffer();
+
+        const base64Image = processedImageBuffer.toString('base64');
 
         // Get image description from OpenAI
         const openaiResponse = await openai.chat.completions.create({
