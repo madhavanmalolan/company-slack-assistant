@@ -44,7 +44,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                     for (const file of threadMessage.files) {
                         try {
                             if (file.mimetype.startsWith('image/')) {
-                                const { content, summary } = await processImage(file.url_private);
+                                const { content, summary } = await processImage(file.url_private_download);
                                 threadContent += `
                                     --------------------------------
                                     Image Description: ${summary}
@@ -52,7 +52,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                     Full Description: ${content}
                                 `;
                             } else if (file.mimetype === 'application/pdf') {
-                                const { content, summary } = await processPDF(file.url_private);
+                                const { content, summary } = await processPDF(file.url_private_download);
                                 threadContent += `
                                     --------------------------------
                                     PDF Summary: ${summary}
@@ -96,7 +96,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
             for (const file of message.files) {
                 try {
                     if (file.mimetype.startsWith('image/')) {
-                        const { content, summary } = await processImage(file.url_private);
+                        const { content, summary } = await processImage(file.url_private_download);
                         storable += `
                             --------------------------------
                             Image Description: ${summary}
@@ -104,7 +104,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                             Full Description: ${content}
                         `;
                     } else if (file.mimetype === 'application/pdf') {
-                        const { content, summary } = await processPDF(file.url_private);
+                        const { content, summary } = await processPDF(file.url_private_download);
                         storable += `
                             --------------------------------
                             PDF Summary: ${summary}
