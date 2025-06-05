@@ -4,10 +4,12 @@ const { google } = require('googleapis');
 const { marked } = require('marked');
 const cheerio = require('cheerio');
 const OpenAI = require('openai');
+const { Anthropic } = require('@anthropic-ai/sdk');
 
 // Initialize clients
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Initialize Google Drive client
 const auth = new google.auth.GoogleAuth({
@@ -37,6 +39,152 @@ async function processNotionLink(url) {
         for (const block of blocks.results) {
             if (block.type === 'paragraph') {
                 content += block.paragraph.rich_text.map(text => text.plain_text).join('') + '\n';
+            } else if (block.type === 'table') {
+                // Get table rows
+                const tableRows = await notion.blocks.children.list({ block_id: block.id });
+                let tableContent = '';
+                let rowCount = 0;
+                
+                // Get header row for context
+                const headerRow = tableRows.results[0];
+                const headers = headerRow.table_row.cells.map(cell => 
+                    cell.map(text => text.plain_text).join('')
+                );
+                
+                // Process each row (skip header)
+                for (let i = 1; i < tableRows.results.length; i++) {
+                    const row = tableRows.results[i];
+                    if (row.type === 'table_row') {
+                        const cells = row.table_row.cells.map(cell => 
+                            cell.map(text => text.plain_text).join('')
+                        );
+                        
+                        // Create a row object with headers
+                        const rowData = {};
+                        headers.forEach((header, index) => {
+                            rowData[header] = cells[index];
+                        });
+                        
+                        // Generate summary for the row
+                        const rowSummary = await anthropic.messages.create({
+                            model: "claude-3-5-sonnet-20240620",
+                            max_tokens: 100,
+                            messages: [{
+                                role: "user",
+                                content: `Summarize this table row in one concise sentence:\n${JSON.stringify(rowData, null, 2)}`
+                            }]
+                        });
+                        
+                        tableContent += `${rowSummary.content[0].text}\n`;
+                        rowCount++;
+                    }
+                }
+                
+                // Add table summary
+                content += `[Table with ${rowCount} rows:\n${tableContent}]\n`;
+            } else if (block.type === 'child_database') {
+                // Handle database
+                try {
+                    const database = await notion.databases.retrieve({ database_id: block.id });
+                    const databaseQuery = await notion.databases.query({ database_id: block.id });
+                    
+                    // Get property names from database schema
+                    const propertyNames = Object.keys(database.properties);
+                    
+                    // Format database content
+                    let dbContent = `[Database: ${database.title[0]?.plain_text || 'Untitled'}\n`;
+                    dbContent += `Properties: ${propertyNames.join(', ')}\n\n`;
+                    
+                    // Process each page in the database
+                    for (const page of databaseQuery.results) {
+                        let pageData = {};
+                        for (const propName of propertyNames) {
+                            const prop = page.properties[propName];
+                            let value = '';
+                            
+                            // Handle different property types
+                            switch (prop.type) {
+                                case 'title':
+                                    value = prop.title.map(t => t.plain_text).join('');
+                                    break;
+                                case 'rich_text':
+                                    value = prop.rich_text.map(t => t.plain_text).join('');
+                                    break;
+                                case 'number':
+                                    value = prop.number?.toString() || '';
+                                    break;
+                                case 'select':
+                                    value = prop.select?.name || '';
+                                    break;
+                                case 'multi_select':
+                                    value = prop.multi_select.map(s => s.name).join(', ');
+                                    break;
+                                case 'date':
+                                    value = prop.date ? `${prop.date.start}${prop.date.end ? ` to ${prop.date.end}` : ''}` : '';
+                                    break;
+                                case 'people':
+                                    value = prop.people.map(p => p.name).join(', ');
+                                    break;
+                                case 'files':
+                                    value = prop.files.map(f => f.name).join(', ');
+                                    break;
+                                case 'checkbox':
+                                    value = prop.checkbox ? 'Yes' : 'No';
+                                    break;
+                                case 'url':
+                                    value = prop.url || '';
+                                    break;
+                                case 'email':
+                                    value = prop.email || '';
+                                    break;
+                                case 'phone_number':
+                                    value = prop.phone_number || '';
+                                    break;
+                                case 'formula':
+                                    value = prop.formula?.string || prop.formula?.number?.toString() || '';
+                                    break;
+                                case 'relation':
+                                    value = prop.relation.map(r => r.id).join(', ');
+                                    break;
+                                case 'rollup':
+                                    value = prop.rollup?.string || prop.rollup?.number?.toString() || '';
+                                    break;
+                                case 'created_time':
+                                    value = prop.created_time;
+                                    break;
+                                case 'created_by':
+                                    value = prop.created_by.name;
+                                    break;
+                                case 'last_edited_time':
+                                    value = prop.last_edited_time;
+                                    break;
+                                case 'last_edited_by':
+                                    value = prop.last_edited_by.name;
+                                    break;
+                            }
+                            
+                            pageData[propName] = value;
+                        }
+                        
+                        // Generate summary for the database item
+                        const itemSummary = await anthropic.messages.create({
+                            model: "claude-3-5-sonnet-20240620",
+                            max_tokens: 100,
+                            messages: [{
+                                role: "user",
+                                content: `Summarize this database item in one concise sentence:\n${JSON.stringify(pageData, null, 2)}`
+                            }]
+                        });
+                        
+                        dbContent += `${itemSummary.content[0].text}\n`;
+                    }
+                    
+                    dbContent += `]\n`;
+                    content += dbContent;
+                } catch (error) {
+                    console.error('Error processing database:', error);
+                    content += `[Error processing database: ${error.message}]\n`;
+                }
             } else if (block.type === 'image') {
                 // Process image with OpenAI
                 const imageUrl = block.image.file?.url || block.image.external?.url;
@@ -122,7 +270,41 @@ async function processGoogleDriveLink(url) {
                         mimeType: 'text/csv',
                         supportsAllDrives: true
                     });
-                    content = sheet.data;
+                    
+                    // Parse CSV content
+                    const rows = sheet.data.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+                    if (rows.length > 0) {
+                        const headers = rows[0];
+                        let spreadsheetContent = `[Spreadsheet: ${file.data.name}\n`;
+                        spreadsheetContent += `Columns: ${headers.join(', ')}\n\n`;
+                        
+                        // Process each row (skip header)
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (row.length === headers.length) {
+                                // Create a row object with headers
+                                const rowData = {};
+                                headers.forEach((header, index) => {
+                                    rowData[header] = row[index];
+                                });
+                                
+                                // Generate summary for the row
+                                const rowSummary = await anthropic.messages.create({
+                                    model: "claude-3-5-sonnet-20240620",
+                                    max_tokens: 100,
+                                    messages: [{
+                                        role: "user",
+                                        content: `Summarize this spreadsheet row in one concise sentence:\n${JSON.stringify(rowData, null, 2)}`
+                                    }]
+                                });
+                                
+                                spreadsheetContent += `${rowSummary.content[0].text}\n`;
+                            }
+                        }
+                        
+                        spreadsheetContent += `]\n`;
+                        content = spreadsheetContent;
+                    }
                     break;
                 case 'application/vnd.google-apps.presentation':
                     const slides = await drive.files.export({ 

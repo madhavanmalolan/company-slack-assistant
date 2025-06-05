@@ -246,10 +246,24 @@ async function getRelevantContext(query, maxTokens = 4000) {
     let currentTokens = 0;
     
     for (const message of similarMessages) {
-        const messageTokens = estimateTokens(message.content);
+        let messageContent = message.content;
+        
+        // Check for Notion links in the content
+        const notionLinks = messageContent.match(/https:\/\/[^/\s]+\.notion\.so\/[^\s]+/g) || [];
+        for (const link of notionLinks) {
+            try {
+                const { content, summary } = await processLink(link);
+                // Replace the link with its summary
+                messageContent = messageContent.replace(link, `[${link}]\nSummary: ${summary}`);
+            } catch (error) {
+                console.error('Error processing Notion link in context:', error);
+            }
+        }
+        
+        const messageTokens = estimateTokens(messageContent);
         if (currentTokens + messageTokens > maxTokens) break;
         
-        context += `Message from ${message.user_name} (${message.user_title}): ${message.content}\n\n`;
+        context += `Message from ${message.user_name} (${message.user_title}): ${messageContent}\n\n`;
         currentTokens += messageTokens;
     }
     

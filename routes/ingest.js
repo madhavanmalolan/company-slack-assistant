@@ -213,6 +213,12 @@ router.post('/', async (req, res) => {
                 return;
 
             case 'app_mention':
+                // Add eyes reaction to the message
+                await slack.reactions.add({
+                    channel: event.channel,
+                    name: 'eyes',
+                    timestamp: event.ts
+                });
                 console.log('Processing tagged message...');
                 const taggedMessage = await processIncomingMessagePayload(event, req);
                 console.log('Tagged message:', taggedMessage.substring(0, 40));
@@ -285,12 +291,42 @@ router.post('/', async (req, res) => {
 
             default:
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
+                // Skip if message is from bot or mentions the bot
+                if (event.user === process.env.SLACK_BOT_ID || 
+                    (event.text && event.text.includes(`<@${process.env.SLACK_BOT_ID}>`))) {
+                    console.log("Skipping bot message or message mentioning bot");
+                    return;
+                }
+
+                // Process links in the message
+                const links = extractLinks(event.text);
+                if (links.length > 0) {
+                    let summaryText = "Here's a summary of the links in your message:\n\n";
+                    
+                    for (const link of links) {
+                        try {
+                            const { content, summary } = await processLink(link);
+                            summaryText += `*${link}*\n${summary}\n\n`;
+                        } catch (error) {
+                            console.error(`Error processing link ${link}:`, error);
+                            summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
+                        }
+                    }
+
+                    // Send the summary as a thread reply
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        thread_ts: event.ts,
+                        text: summaryText
+                    });
+                }
+
                 const storable = await processIncomingMessagePayload(event, req);
                 // Get user info
                 const userInfo = await slack.users.info({ user: event.user });
                 const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
                 const senderTitle = userInfo.user.profile.title || 'No title';
-                await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);        
+                await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);
         }
     } catch (error) {
         console.error('Error processing Slack message:', error);
