@@ -15,7 +15,7 @@ const sharp = require('sharp');
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
 
 // Initialize Google Drive client
 const auth = new google.auth.GoogleAuth({
@@ -491,7 +491,7 @@ async function processImage(url) {
         // Download the file content
         const imageResponse = await fetch(fileResponse.file.url_private_download, {
             headers: {
-                'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
+                'Authorization': `Bearer ${process.env.SLACK_BOT_OAUTH}`
             }
         });
         
