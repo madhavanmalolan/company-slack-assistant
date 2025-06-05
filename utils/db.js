@@ -183,7 +183,7 @@ async function deleteChannelMessages(channelName) {
 }
 
 // Improved search function with filters
-async function searchSimilarMessages(query, limit = 5, minSimilarity = 0.7, filters = {}) {
+async function searchSimilarMessages(queryText, limit = 5, minSimilarity = 0.7, filters = {}) {
     try {
         const { channel, user, minDate, maxDate } = filters;
         let whereClause = 'WHERE 1=1';
@@ -206,10 +206,10 @@ async function searchSimilarMessages(query, limit = 5, minSimilarity = 0.7, filt
             params.push(maxDate);
         }
         
-        const embedding = await generateEmbedding(query);
+        const embedding = await generateEmbedding(queryText);
         params.push(`[${embedding.join(',')}]`, limit, minSimilarity);
         
-        const query = `
+        const sqlQuery = `
             WITH ranked_messages AS (
                 SELECT 
                     channel_name,
@@ -231,7 +231,7 @@ async function searchSimilarMessages(query, limit = 5, minSimilarity = 0.7, filt
             LIMIT $${params.length};
         `;
         
-        const result = await pool.query(query, params);
+        const result = await pool.query(sqlQuery, params);
         return result.rows;
     } catch (error) {
         console.error('Error searching similar messages:', error);
