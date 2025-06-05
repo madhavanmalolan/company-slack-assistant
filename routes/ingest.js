@@ -98,7 +98,7 @@ async function processMessage(message, channelId, channelName, channelDescriptio
         const userInfo = await slack.users.info({ user: message.user });
         const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : message.user;
         const senderTitle = userInfo.user.profile.title || 'No title';
-        await chunkAndStoreMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle);
+        await chunkAndStoreMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle, message.ts);
     }
 }
 
@@ -136,7 +136,6 @@ router.post('/', async (req, res) => {
         const userId = req.body.event.user;
         const unfurledLinks = req.body.event.links || [];
         
-
         // Get user info
         const userInfo = await slack.users.info({ user: userId });
         const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
@@ -238,7 +237,10 @@ router.post('/', async (req, res) => {
                         const userInfo = await slack.users.info({ user: msg.user });
                         const userName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : msg.user;
                         const userTitle = userInfo.user?.profile?.title || 'No title';
-                        return `Message from ${userName} (${userTitle}): ${msg.text}`;
+                        const messageDate = new Date(parseFloat(msg.ts) * 1000);
+                        const now = new Date();
+                        const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
+                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}`;
                     } catch (error) {
                         console.error('Error getting user info:', error);
                         return `Message from ${msg.user}: ${msg.text}`;
@@ -247,11 +249,14 @@ router.post('/', async (req, res) => {
 
                 const threadText = threadMessages.join('\n\n');
                 const fullContext = `
-                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response. : 
+                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response.
+                    
+                    Important: When processing information, pay special attention to the recency of the messages. Information from more recent messages should be given higher priority, and you should explicitly mention if you're using older information that might be outdated.
+                    
                     About the company : 
                     ${aboutReclaimShort}
                     
-                    Relevant context from the knowledge base:
+                    Relevant context from the knowledge base (sorted by recency):
                     ${context}
                     
                     Current conversation thread:
@@ -324,7 +329,7 @@ router.post('/', async (req, res) => {
                     const userInfo = await slack.users.info({ user: event.user });
                     const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
                     const senderTitle = userInfo.user.profile.title || 'No title';
-                    await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);
+                    await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle, event.ts);
                 }
         }
     } catch (error) {

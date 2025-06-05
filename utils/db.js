@@ -104,10 +104,13 @@ function splitIntoChunks(text, maxTokens) {
 }
 
 // Store message with embedding and chunking
-async function storeMessage(channelName, threadTs, content, userName = null, userTitle = null, chunkIndex = 0, metadata = {}) {
+async function storeMessage(channelName, threadTs, content, userName = null, userTitle = null, chunkIndex = 0, metadata = {}, messageTs = null) {
     try {
         const embedding = await generateEmbedding(content);
         const embeddingArray = `[${embedding.join(',')}]`;
+        
+        // Convert Slack timestamp to PostgreSQL timestamp
+        const messageDate = messageTs ? new Date(parseFloat(messageTs) * 1000) : new Date();
         
         // Check if a message with this thread_ts and chunk_index already exists
         const existingMessage = await pool.query(
@@ -120,13 +123,13 @@ async function storeMessage(channelName, threadTs, content, userName = null, use
             const query = `
                 UPDATE messages 
                 SET content = $4, user_name = $5, user_title = $6, embedding = $7::vector, 
-                    metadata = $8, created_at = CURRENT_TIMESTAMP
+                    metadata = $8, created_at = $9
                 WHERE channel_name = $1 AND thread_ts = $2 AND chunk_index = $3
                 RETURNING id;
             `;
             const result = await pool.query(query, [
                 channelName, threadTs, chunkIndex, content, userName, userTitle, 
-                embeddingArray, metadata
+                embeddingArray, metadata, messageDate
             ]);
             console.log('Message updated with ID:', result.rows[0].id);
             return result.rows[0].id;
@@ -134,13 +137,13 @@ async function storeMessage(channelName, threadTs, content, userName = null, use
             // Insert new message
             const query = `
                 INSERT INTO messages (channel_name, thread_ts, content, user_name, user_title, 
-                                    chunk_index, metadata, embedding)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector)
+                                    chunk_index, metadata, embedding, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)
                 RETURNING id;
             `;
             const result = await pool.query(query, [
                 channelName, threadTs, content, userName, userTitle, 
-                chunkIndex, metadata, embeddingArray
+                chunkIndex, metadata, embeddingArray, messageDate
             ]);
             console.log('Message stored with ID:', result.rows[0].id);
             return result.rows[0].id;
@@ -152,7 +155,7 @@ async function storeMessage(channelName, threadTs, content, userName = null, use
 }
 
 // Function to chunk and store message
-async function chunkAndStoreMessage(channelName, threadTs, content, userName, userTitle) {
+async function chunkAndStoreMessage(channelName, threadTs, content, userName, userTitle, messageTs = null) {
     // Split content into smaller chunks (e.g., 1000 tokens each)
     const chunks = splitIntoChunks(content, 1000);
     
@@ -165,7 +168,8 @@ async function chunkAndStoreMessage(channelName, threadTs, content, userName, us
             userName,
             userTitle,
             chunks.indexOf(chunk),
-            { total_chunks: chunks.length }
+            { total_chunks: chunks.length },
+            messageTs
         );
     }
 }
@@ -251,8 +255,16 @@ async function getRelevantContext(query, maxTokens = 4000) {
     let context = '';
     let currentTokens = 0;
     
+    // Sort messages by recency
+    similarMessages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
     for (const message of similarMessages) {
         let messageContent = message.content;
+        
+        // Calculate days since the message was created
+        const messageDate = new Date(message.created_at);
+        const now = new Date();
+        const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
         
         // Check for Notion links in the content
         const notionLinks = messageContent.match(/https:\/\/[^/\s]+\.notion\.so\/[^\s]+/g) || [];
@@ -269,7 +281,7 @@ async function getRelevantContext(query, maxTokens = 4000) {
         const messageTokens = estimateTokens(messageContent);
         if (currentTokens + messageTokens > maxTokens) break;
         
-        context += `Message from ${message.user_name} (${message.user_title}): ${messageContent}\n\n`;
+        context += `Message from ${message.user_name} (${message.user_title}) ${daysSince} days ago: ${messageContent}\n\n`;
         currentTokens += messageTokens;
     }
     
