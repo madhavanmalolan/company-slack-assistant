@@ -266,6 +266,9 @@ async function getRelevantContext(query, maxTokens = 4000) {
         const now = new Date();
         const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
         
+        // Construct Slack message link
+        const messageLink = `https://${process.env.SLACK_BASE_URI}/${message.channel_name}/p${message.thread_ts.replace('.', '')}`;
+        
         // Check for Notion links in the content
         const notionLinks = messageContent.match(/https:\/\/[^/\s]+\.notion\.so\/[^\s]+/g) || [];
         for (const link of notionLinks) {
@@ -281,7 +284,7 @@ async function getRelevantContext(query, maxTokens = 4000) {
         const messageTokens = estimateTokens(messageContent);
         if (currentTokens + messageTokens > maxTokens) break;
         
-        context += `Message from ${message.user_name} (${message.user_title}) ${daysSince} days ago: ${messageContent}\n\n`;
+        context += `Message from ${message.user_name} (${message.user_title}) ${daysSince} days ago: ${messageContent}\nLink: ${messageLink}\n\n`;
         currentTokens += messageTokens;
     }
     

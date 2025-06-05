@@ -356,8 +356,7 @@ router.post('/', async (req, res) => {
                         const messageDate = new Date(parseFloat(msg.ts) * 1000);
                         const now = new Date();
                         const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
-                        const messageLink = `https://${process.env.SLACK_BASE_URI}/${event.channel}/p${msg.ts.replace('.', '')}`;
-                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}\nLink: ${messageLink}`;
+                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}`;
                     } catch (error) {
                         console.error('Error getting user info:', error);
                         return `Message from ${msg.user}: ${msg.text}`;
