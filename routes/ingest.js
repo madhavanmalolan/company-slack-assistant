@@ -356,7 +356,8 @@ router.post('/', async (req, res) => {
                         const messageDate = new Date(parseFloat(msg.ts) * 1000);
                         const now = new Date();
                         const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
-                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}`;
+                        const messageLink = `https://${process.env.SLACK_BASE_URI}/${event.channel}/p${msg.ts.replace('.', '')}`;
+                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}\nLink: ${messageLink}`;
                     } catch (error) {
                         console.error('Error getting user info:', error);
                         return `Message from ${msg.user}: ${msg.text}`;
@@ -368,6 +369,7 @@ router.post('/', async (req, res) => {
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response.
                     
                     Important: When processing information, pay special attention to the recency of the messages. Information from more recent messages should be given higher priority, and you should explicitly mention if you're using older information that might be outdated.
+                    If you are using information from a message link, make sure to include the link in your response.
                     
                     About the company : 
                     ${aboutReclaimShort}
