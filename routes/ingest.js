@@ -126,6 +126,64 @@ const processIncomingMessagePayload = async (event, req) => {
     return await processMessageContent(message, channelId, channelName, channelDescription, channelTopic);
 };
 
+// Function to format message with blocks
+function formatMessageWithBlocks(text) {
+    // Split text into sections based on markdown headers
+    const sections = text.split(/(?=^|\n)(#{1,6}\s.*$)/m);
+    const blocks = [];
+    
+    for (const section of sections) {
+        if (!section.trim()) continue;
+        
+        // Check if this is a header
+        const headerMatch = section.match(/^(#{1,6})\s(.*)$/m);
+        if (headerMatch) {
+            const level = headerMatch[1].length;
+            const content = headerMatch[2].trim();
+            blocks.push({
+                type: "header",
+                text: {
+                    type: "plain_text",
+                    text: content,
+                    emoji: true
+                }
+            });
+            continue;
+        }
+        
+        // Process regular text with markdown
+        let processedText = section.trim();
+        
+        // Convert markdown bold to Slack bold
+        processedText = processedText.replace(/\*\*(.*?)\*\*/g, '*$1*');
+        
+        // Convert markdown italic to Slack italic
+        processedText = processedText.replace(/\*(.*?)\*/g, '_$1_');
+        
+        // Convert markdown code blocks
+        processedText = processedText.replace(/```([\s\S]*?)```/g, '```$1```');
+        
+        // Convert markdown inline code
+        processedText = processedText.replace(/`([^`]+)`/g, '`$1`');
+        
+        // Convert markdown lists
+        processedText = processedText.replace(/^\s*[-*+]\s+(.*)$/gm, '• $1');
+        
+        // Convert markdown links
+        processedText = processedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>');
+        
+        blocks.push({
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: processedText
+            }
+        });
+    }
+    
+    return blocks;
+}
+
 // Endpoint to handle Slack messages
 router.post('/', async (req, res) => {
     try {
@@ -162,7 +220,7 @@ router.post('/', async (req, res) => {
                     // Send welcome message
                     await slack.chat.postMessage({
                         channel: event.channel,
-                        text: `Yay! I'm now in the channel! I will start learning from everything shared in this channel!`
+                        blocks: formatMessageWithBlocks("Yay! I'm now in the channel! I will start learning from everything shared in this channel!")
                     });
 
                     // Process historical messages
@@ -199,7 +257,7 @@ router.post('/', async (req, res) => {
                     console.log(`Processed ${processedCount} historical messages`);
                     await slack.chat.postMessage({
                         channel: event.channel,
-                        text: `OK! I have learnt all there is to learn from this channel! Ask me anything by tagging me!`
+                        blocks: formatMessageWithBlocks(`OK! I have learnt all there is to learn from this channel! Ask me anything by tagging me!`)
                     });
                 }
                 return;
@@ -277,11 +335,11 @@ router.post('/', async (req, res) => {
                         ]
                     });
 
-                    // Send response back to Slack thread
+                    // Send response back to Slack thread with formatting
                     await slack.chat.postMessage({
                         channel: event.channel,
                         thread_ts: event.ts,
-                        text: response.content[0].text
+                        blocks: formatMessageWithBlocks(response.content[0].text)
                     });
 
                 } catch (error) {
@@ -289,7 +347,7 @@ router.post('/', async (req, res) => {
                     await slack.chat.postMessage({
                         channel: event.channel,
                         thread_ts: event.ts,
-                        text: "Sorry, I encountered an error processing your request."
+                        blocks: formatMessageWithBlocks("Sorry, I encountered an error processing your request.")
                     });
                 }
                 return;
@@ -313,11 +371,11 @@ router.post('/', async (req, res) => {
                         }
                     }
 
-                    // Send the summary as a thread reply
+                    // Send the summary as a thread reply with formatting
                     await slack.chat.postMessage({
                         channel: event.channel,
                         thread_ts: event.ts,
-                        text: summaryText
+                        blocks: formatMessageWithBlocks(summaryText)
                     });
                 }
 
