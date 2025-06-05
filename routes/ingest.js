@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { WebClient } = require('@slack/web-api');
-const { extractLinks, processLink } = require('../utils/linkProcessor');
+const { extractLinks, processLink, processImage, processPDF } = require('../utils/linkProcessor');
 const { storeMessage, searchSimilarMessages, chunkAndStoreMessage, getRelevantContext } = require('../utils/db');
-const Anthropic = require('@anthropic-ai/sdk');
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const { deleteChannelMessages } = require('../utils/db');
-const {aboutReclaimShort} = require('../utils/contextText');
+const { generateEmbedding } = require('../utils/embeddings');
+const { Anthropic } = require('@anthropic-ai/sdk');
+const { OpenAI } = require('openai');
+const { chromium } = require('playwright');
+const { aboutReclaimShort } = require('../utils/contextText');
 
 // Initialize Slack Web API client
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
