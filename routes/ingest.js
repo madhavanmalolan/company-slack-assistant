@@ -110,11 +110,12 @@ const processIncomingMessagePayload = async (event, req) => {
     const userId = event.user;
 
     // Get channel info
+    console.log('Getting channel info...');
     const channelInfo = await slack.conversations.info({ channel: channelId });
     const channelName = channelInfo.channel.name;
     const channelDescription = channelInfo.channel.purpose?.value || 'No description';
     const channelTopic = channelInfo.channel.topic?.value || 'No topic';
-
+    console.log('Channel info:', channelInfo);
     const message = {
         text: messageText,
         user: userId,
