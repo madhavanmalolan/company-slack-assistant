@@ -456,19 +456,133 @@ async function generateSummary(content) {
     }
 }
 
-// Main function to process any link
+// Process image with OpenAI Vision
+async function processImage(url) {
+    try {
+        const browser = await chromium.launch();
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await page.goto(url);
+        // Wait for 3 seconds to ensure image loads
+        await page.waitForTimeout(3000);
+        
+        // Get the image element and convert to base64
+        const base64Image = await page.evaluate(async () => {
+            const img = document.querySelector('img');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            return canvas.toDataURL('image/jpeg').split(',')[1];
+        });
+
+        await browser.close();
+
+        // Get image description from OpenAI
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-vision-preview",
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: "Describe this image in detail, focusing on the key elements, context, and any text that appears in it:" },
+                        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+                    ]
+                }
+            ],
+            max_tokens: 300
+        });
+
+        const description = response.choices[0].message.content;
+        
+        // Generate a concise summary using Claude
+        const summary = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 100,
+            messages: [{
+                role: "user",
+                content: `Create a concise one-sentence summary of this image description:\n${description}`
+            }]
+        });
+
+        return {
+            content: description,
+            summary: summary.content[0].text
+        };
+    } catch (error) {
+        console.error('Error processing image:', error);
+        throw error;
+    }
+}
+
+// Process PDF with OpenAI
+async function processPDF(url) {
+    try {
+        const browser = await chromium.launch();
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await page.goto(url);
+        
+        // Wait for PDF to load
+        await page.waitForTimeout(3000);
+        
+        // Extract text from PDF
+        const text = await page.evaluate(() => {
+            return document.body.innerText;
+        });
+
+        await browser.close();
+
+        // Generate a summary using Claude
+        const summary = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 300,
+            messages: [{
+                role: "user",
+                content: `Summarize the key points from this PDF content in a concise paragraph:\n${text}`
+            }]
+        });
+
+        return {
+            content: text,
+            summary: summary.content[0].text
+        };
+    } catch (error) {
+        console.error('Error processing PDF:', error);
+        throw error;
+    }
+}
+
+// Process link with enhanced file type detection
 async function processLink(url) {
     try {
-        let content;
-        console.log("Processing url : ", url);
-        
+        // Check if it's a Notion link
         if (url.includes('notion.so')) {
-            content = await processNotionLink(url);
-        } else if (url.includes('docs.google.com') || url.includes('drive.google.com')) {
-            content = await processGoogleDriveLink(url);
-        } else {
-            content = await processExternalLink(url);
+            const content = await processNotionLink(url);
+            const summary = await generateSummary(content);
+            return { content, summary };
         }
+        
+        // Check if it's a Google Drive link
+        if (url.includes('drive.google.com')) {
+            const content = await processGoogleDriveLink(url);
+            const summary = await generateSummary(content);
+            return { content, summary };
+        }
+        
+        // Check if it's an image
+        if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+            return await processImage(url);
+        }
+        
+        // Check if it's a PDF
+        if (url.match(/\.pdf$/i)) {
+            return await processPDF(url);
+        }
+        
+        // Process as external link
+        const content = await processExternalLink(url);
         const summary = await generateSummary(content);
         return { content, summary };
     } catch (error) {

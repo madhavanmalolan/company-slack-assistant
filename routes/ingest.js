@@ -19,6 +19,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
         if (message.user === process.env.SLACK_BOT_ID) {
             return null;
         }
+
         // Get thread info if it exists
         let threadContent = '';
         if (message.thread_ts) {
@@ -38,6 +39,33 @@ async function processMessageContent(message, channelId, channelName, channelDes
                     --------------------------------
                     ${threadMessage.text}
                 `;
+
+                // Process any files in the reply
+                if (threadMessage.files) {
+                    for (const file of threadMessage.files) {
+                        try {
+                            if (file.mimetype.startsWith('image/')) {
+                                const { content, summary } = await processImage(file.url_private);
+                                threadContent += `
+                                    --------------------------------
+                                    Image Description: ${summary}
+                                    --------------------------------
+                                    Full Description: ${content}
+                                `;
+                            } else if (file.mimetype === 'application/pdf') {
+                                const { content, summary } = await processPDF(file.url_private);
+                                threadContent += `
+                                    --------------------------------
+                                    PDF Summary: ${summary}
+                                    --------------------------------
+                                    Full Content: ${content}
+                                `;
+                            }
+                        } catch (error) {
+                            console.error(`Error processing file ${file.name}:`, error);
+                        }
+                    }
+                }
 
                 // Process any links in the reply
                 const replyLinks = extractLinks(threadMessage.text);
@@ -63,6 +91,33 @@ async function processMessageContent(message, channelId, channelName, channelDes
         let storable = `            
             ${threadContent || message.text}
         `;
+
+        // Process any files in the message
+        if (message.files) {
+            for (const file of message.files) {
+                try {
+                    if (file.mimetype.startsWith('image/')) {
+                        const { content, summary } = await processImage(file.url_private);
+                        storable += `
+                            --------------------------------
+                            Image Description: ${summary}
+                            --------------------------------
+                            Full Description: ${content}
+                        `;
+                    } else if (file.mimetype === 'application/pdf') {
+                        const { content, summary } = await processPDF(file.url_private);
+                        storable += `
+                            --------------------------------
+                            PDF Summary: ${summary}
+                            --------------------------------
+                            Full Content: ${content}
+                        `;
+                    }
+                } catch (error) {
+                    console.error(`Error processing file ${file.name}:`, error);
+                }
+            }
+        }
 
         // Process any links in the message
         const links = extractLinks(message.text);
