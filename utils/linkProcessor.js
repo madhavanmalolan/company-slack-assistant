@@ -5,6 +5,10 @@ const { marked } = require('marked');
 const cheerio = require('cheerio');
 const OpenAI = require('openai');
 const { Anthropic } = require('@anthropic-ai/sdk');
+const express = require('express');
+const router = express.Router();
+const { WebClient } = require('@slack/web-api');
+const fetch = require('node-fetch');
 
 // Initialize clients
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
@@ -459,28 +463,22 @@ async function generateSummary(content) {
 // Process image with OpenAI Vision
 async function processImage(url) {
     try {
-        const browser = await chromium.launch();
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(url);
-        // Wait for 3 seconds to ensure image loads
-        await page.waitForTimeout(3000);
-        
-        // Get the image element and convert to base64
-        const base64Image = await page.evaluate(async () => {
-            const img = document.querySelector('img');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            return canvas.toDataURL('image/jpeg').split(',')[1];
+        // Download the image
+        const imageResponse = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
+            }
         });
+        
+        if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.statusText}`);
+        }
 
-        await browser.close();
+        const imageBuffer = await imageResponse.buffer();
+        const base64Image = imageBuffer.toString('base64');
 
         // Get image description from OpenAI
-        const response = await openai.chat.completions.create({
+        const openaiResponse = await openai.chat.completions.create({
             model: "gpt-4-vision-preview",
             messages: [
                 {
@@ -494,7 +492,7 @@ async function processImage(url) {
             max_tokens: 300
         });
 
-        const description = response.choices[0].message.content;
+        const description = openaiResponse.choices[0].message.content;
         
         // Generate a concise summary using Claude
         const summary = await anthropic.messages.create({
