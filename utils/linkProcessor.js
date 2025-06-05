@@ -593,5 +593,7 @@ async function processLink(url) {
 
 module.exports = {
     extractLinks,
-    processLink
+    processLink,
+    processImage,
+    processPDF
 }; 
