@@ -467,10 +467,14 @@ async function processImage(url) {
     try {
         console.log('Processing image URL:', url);
         
-        // Extract file ID from the URL
-        const fileId = url.split('/').pop().split('.')[0];
+        // Extract file ID from the URL (format: .../T5UN5PGMT-F0901R23DU6/download/image.png)
+        const fileId = url.split('/').find(part => part.includes('-'));
         console.log('Extracted file ID:', fileId);
         
+        if (!fileId) {
+            throw new Error('Could not extract file ID from URL');
+        }
+
         // Download the image using Slack Web API
         const fileResponse = await slack.files.info({
             token: process.env.SLACK_BOT_TOKEN,
