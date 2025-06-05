@@ -71,7 +71,7 @@ async function processNotionLink(url) {
                             max_tokens: 100,
                             messages: [{
                                 role: "user",
-                                content: `Summarize this table row in one concise sentence:\n${JSON.stringify(rowData, null, 2)}`
+                                content: `Using the column titles as context, summarize this table row in one concise sentence. Make sure to reference the column titles in your summary:\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
                             }]
                         });
                         
@@ -172,7 +172,7 @@ async function processNotionLink(url) {
                             max_tokens: 100,
                             messages: [{
                                 role: "user",
-                                content: `Summarize this database item in one concise sentence:\n${JSON.stringify(pageData, null, 2)}`
+                                content: `Using the property names as context, summarize this database item in one concise sentence. Make sure to reference the property names in your summary:\nProperties: ${propertyNames.join(', ')}\nItem Data: ${JSON.stringify(pageData, null, 2)}`
                             }]
                         });
                         
@@ -294,7 +294,7 @@ async function processGoogleDriveLink(url) {
                                     max_tokens: 100,
                                     messages: [{
                                         role: "user",
-                                        content: `Summarize this spreadsheet row in one concise sentence:\n${JSON.stringify(rowData, null, 2)}`
+                                        content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary:\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
                                     }]
                                 });
                                 
