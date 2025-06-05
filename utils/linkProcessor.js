@@ -461,7 +461,7 @@ async function generateSummary(content) {
     }
 }
 
-// Process image with OpenAI Vision
+// Process image with Claude Vision
 async function processImage(url) {
     try {
         // Download the image
@@ -505,22 +505,30 @@ async function processImage(url) {
 
         const base64Image = processedImageBuffer.toString('base64');
 
-        // Get image description from OpenAI
-        const openaiResponse = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: "Describe this image in detail, focusing on the key elements, context, and any text that appears in it:" },
-                        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-                    ]
-                }
-            ],
-            max_tokens: 300
+        // Get image description from Claude
+        const claudeResponse = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 300,
+            messages: [{
+                role: "user",
+                content: [
+                    {
+                        type: "text",
+                        text: "Describe this image in detail, focusing on the key elements, context, and any text that appears in it:"
+                    },
+                    {
+                        type: "image",
+                        source: {
+                            type: "base64",
+                            media_type: "image/jpeg",
+                            data: base64Image
+                        }
+                    }
+                ]
+            }]
         });
 
-        const description = openaiResponse.choices[0].message.content;
+        const description = claudeResponse.content[0].text;
         
         // Generate a concise summary using Claude
         const summary = await anthropic.messages.create({
