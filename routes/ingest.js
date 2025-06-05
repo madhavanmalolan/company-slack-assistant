@@ -98,7 +98,7 @@ async function processMessage(message, channelId, channelName, channelDescriptio
         const userInfo = await slack.users.info({ user: message.user });
         const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : message.user;
         const senderTitle = userInfo.user.profile.title || 'No title';
-        await storeMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle);
+        await chunkAndStoreMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle);
     }
 }
 
@@ -213,23 +213,19 @@ router.post('/', async (req, res) => {
                 return;
 
             case 'app_mention':
-                /*await slack.reactions.add({
-                    channel: event.channel,
-                    timestamp: event.ts,
-                    name: 'eyes'
-                });*/
                 console.log('Processing tagged message...');
                 const taggedMessage = await processIncomingMessagePayload(event, req);
                 console.log('Tagged message:', taggedMessage.substring(0, 40));
-                const similarMessages = await searchSimilarMessages(taggedMessage, 20);
+                
+                // Get relevant context using the new function
+                const context = await getRelevantContext(taggedMessage);
+                
                 // Get all messages in the thread
                 const threadResponse = await slack.conversations.replies({
                     channel: event.channel,
                     ts: event.ts
                 });
 
-                const relevantMessages = similarMessages.filter(message => message.similarity > 0.9);
-                console.log('Relevant messages:', relevantMessages.length);
                 // Process thread messages asynchronously
                 const threadMessages = await Promise.all(threadResponse.messages.map(async (msg) => {
                     try {
@@ -243,26 +239,29 @@ router.post('/', async (req, res) => {
                     }
                 }));
 
-                console.log(relevantMessages.map(message => `Message from ${message.user_name || 'Unknown'} (${message.user_title || 'No title'}) : ${message.content}\n`));
                 const threadText = threadMessages.join('\n\n');
-                const context = `
-                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull informatoin from other soruces including the internet : 
+                const fullContext = `
+                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet : 
                     About the company : 
                     ${aboutReclaimShort}
-                    Below are some of the most similar messages that you may use to answer the question : 
-                    ${relevantMessages.map(message => `Message from ${message.user_name || 'Unknown'} (${message.user_title || 'No title'}) : ${message.content}`).join('\n\n')}
+                    
+                    Relevant context from the knowledge base:
+                    ${context}
+                    
+                    Current conversation thread:
+                    ${threadText}
                 `;
+
                 try {
                     // Call Claude API
                     const response = await anthropic.messages.create({
                         model: "claude-sonnet-4-20250514",
                         max_tokens: 1000,
-                        system: context,
-                        //todo tools
+                        system: fullContext,
                         messages: [
                             {
                                 role: "user",
-                                content: `${threadText}`
+                                content: taggedMessage
                             }
                         ]
                     });
@@ -271,14 +270,11 @@ router.post('/', async (req, res) => {
                     await slack.chat.postMessage({
                         channel: event.channel,
                         thread_ts: event.ts,
-                        text: `${response.content[0].text}
-                        `
+                        text: response.content[0].text
                     });
 
                 } catch (error) {
                     console.error('Error calling Claude or posting to Slack:', error);
-                    
-                    // Send error message to thread
                     await slack.chat.postMessage({
                         channel: event.channel,
                         thread_ts: event.ts,
@@ -294,7 +290,7 @@ router.post('/', async (req, res) => {
                 const userInfo = await slack.users.info({ user: event.user });
                 const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
                 const senderTitle = userInfo.user.profile.title || 'No title';
-                await storeMessage(channelId, threadTs, storable, senderName, senderTitle);        
+                await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle);        
         }
     } catch (error) {
         console.error('Error processing Slack message:', error);
