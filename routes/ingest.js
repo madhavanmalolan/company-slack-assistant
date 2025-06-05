@@ -151,6 +151,7 @@ router.post('/', async (req, res) => {
         const event = req.body.event;
 
         console.log('Processing event:', event.type);
+        console.log('Event:', messageText.substring(0, 40));
         switch (event.type) {
             case 'member_joined_channel':
             case 'group_joined':
