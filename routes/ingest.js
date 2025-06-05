@@ -218,6 +218,7 @@ router.post('/', async (req, res) => {
                     name: 'eyes'
                 });*/
                 const taggedMessage = await processIncomingMessagePayload(event, req);
+                console.log('Tagged message:', taggedMessage.substring(0, 40));
                 const similarMessages = await searchSimilarMessages(taggedMessage, 20);
                 // Get all messages in the thread
                 const threadResponse = await slack.conversations.replies({
@@ -226,7 +227,7 @@ router.post('/', async (req, res) => {
                 });
 
                 const relevantMessages = similarMessages.filter(message => message.similarity > 0.9);
-                
+                console.log('Relevant messages:', relevantMessages.length);
                 // Process thread messages asynchronously
                 const threadMessages = await Promise.all(threadResponse.messages.map(async (msg) => {
                     try {
