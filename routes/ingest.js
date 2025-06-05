@@ -217,6 +217,7 @@ router.post('/', async (req, res) => {
                     timestamp: event.ts,
                     name: 'eyes'
                 });*/
+                console.log('Processing tagged message...');
                 const taggedMessage = await processIncomingMessagePayload(event, req);
                 console.log('Tagged message:', taggedMessage.substring(0, 40));
                 const similarMessages = await searchSimilarMessages(taggedMessage, 20);
