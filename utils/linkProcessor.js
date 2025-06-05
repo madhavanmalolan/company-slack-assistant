@@ -477,7 +477,7 @@ async function processImage(url) {
 
         // Download the image using Slack Web API
         const fileResponse = await slack.files.info({
-            token: process.env.SLACK_BOT_TOKEN,
+            token: process.env.SLACK_BOT_OAUTH,
             file: fileId
         });
 
