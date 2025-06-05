@@ -227,16 +227,27 @@ router.post('/', async (req, res) => {
                 });
 
                 const relevantMessages = similarMessages.filter(message => message.similarity > 0.9);
-                // Extract just the message text from each reply
-                const threadText = threadResponse.messages
-                    .map(msg => `Message from ${slack.users.info({ user: msg.user }).user? (slack.users.info({ user: msg.user }).user.real_name || slack.users.info({ user: msg.user }).user.name) : msg.user} (${slack.users.info({ user: msg.user }).user.profile.title || 'No title'}): ${msg.text}`)
-                    .join('\n\n');
+                
+                // Process thread messages asynchronously
+                const threadMessages = await Promise.all(threadResponse.messages.map(async (msg) => {
+                    try {
+                        const userInfo = await slack.users.info({ user: msg.user });
+                        const userName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : msg.user;
+                        const userTitle = userInfo.user?.profile?.title || 'No title';
+                        return `Message from ${userName} (${userTitle}): ${msg.text}`;
+                    } catch (error) {
+                        console.error('Error getting user info:', error);
+                        return `Message from ${msg.user}: ${msg.text}`;
+                    }
+                }));
+
+                const threadText = threadMessages.join('\n\n');
                 const context = `
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull informatoin from other soruces including the internet : 
                     About the company : 
                     ${aboutReclaimShort}
                     Below are some of the most similar messages that you may use to answer the question : 
-                    ${relevantMessages.map(message => `Message from ${message.senderName} (${message.senderTitle}) : ${message.content}`).join('\n\n')}
+                    ${relevantMessages.map(message => `Message from ${message.user_name || 'Unknown'} (${message.user_title || 'No title'}) : ${message.content}`).join('\n\n')}
                 `;
                 try {
                     // Call Claude API
