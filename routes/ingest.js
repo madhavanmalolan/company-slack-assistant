@@ -247,7 +247,7 @@ router.post('/', async (req, res) => {
 
                 const threadText = threadMessages.join('\n\n');
                 const fullContext = `
-                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet : 
+                    You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response. : 
                     About the company : 
                     ${aboutReclaimShort}
                     
