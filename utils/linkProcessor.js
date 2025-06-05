@@ -468,7 +468,7 @@ async function processImage(url) {
         console.log('Processing image URL:', url);
         
         // Extract file ID from the URL (format: .../T5UN5PGMT-F0901R23DU6/download/image.png)
-        const fileId = url.split('/').find(part => part.includes('-'));
+        const fileId = url.split('/')[4];
         console.log('Extracted file ID:', fileId);
         
         if (!fileId) {
