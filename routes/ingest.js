@@ -267,7 +267,6 @@ router.post('/', async (req, res) => {
         const event = req.body.event;
 
         console.log('Processing event:', event.type);
-        console.log('Event:', messageText.substring(0, 40));
         switch (event.type) {
             case 'member_joined_channel':
             case 'group_joined':
@@ -356,7 +355,7 @@ router.post('/', async (req, res) => {
                         const messageDate = new Date(parseFloat(msg.ts) * 1000);
                         const now = new Date();
                         const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
-                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}`;
+                        return `Message from ${userName} (${userTitle}) ${daysSince} days ago: ${msg.text}\n`;
                     } catch (error) {
                         console.error('Error getting user info:', error);
                         return `Message from ${msg.user}: ${msg.text}`;
