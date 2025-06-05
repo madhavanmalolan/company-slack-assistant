@@ -479,7 +479,7 @@ async function processImage(url) {
 
         // Get image description from OpenAI
         const openaiResponse = await openai.chat.completions.create({
-            model: "gpt-4-vision-preview",
+            model: "gpt-4-vision",
             messages: [
                 {
                     role: "user",
