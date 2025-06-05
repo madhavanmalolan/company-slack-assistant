@@ -223,7 +223,7 @@ async function searchSimilarMessages(queryText, limit = 5, minSimilarity = 0.7, 
                     ROW_NUMBER() OVER (PARTITION BY thread_ts ORDER BY 1 - (embedding <=> $${params.length - 2}::vector) DESC) as rank
                 FROM messages
                 ${whereClause}
-                AND 1 - (embedding <=> $${params.length - 2}::vector) > $${params.length - 1}
+                AND 1 - (embedding <=> $${params.length - 2}::vector) > $${params.length - 1}::float
             )
             SELECT * FROM ranked_messages
             WHERE rank = 1
