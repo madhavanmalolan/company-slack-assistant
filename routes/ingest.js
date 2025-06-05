@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { WebClient } = require('@slack/web-api');
 const { extractLinks, processLink } = require('../utils/linkProcessor');
-const { storeMessage, searchSimilarMessages } = require('../utils/db');
+const { storeMessage, searchSimilarMessages, chunkAndStoreMessage, getRelevantContext } = require('../utils/db');
 const Anthropic = require('@anthropic-ai/sdk');
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
