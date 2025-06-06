@@ -421,10 +421,10 @@ router.post('/', async (req, res) => {
                         try {
                             if (file.mimetype.startsWith('image/')) {
                                 const { content, summary } = await processImage(file.url_private_download);
-                                fileSummaryText += `*Image: ${file.name}*\n${summary}\n\n`;
+                                fileSummaryText += `Image: ${file.name}\n${summary}\n\n`;
                             } else if (file.mimetype === 'application/pdf') {
                                 const { content, summary } = await processPDF(file.url_private_download);
-                                fileSummaryText += `*PDF: ${file.name}*\n${summary}\n\n`;
+                                fileSummaryText += `PDF: ${file.name}\n${summary}\n\n`;
                             }
                         } catch (error) {
                             console.error(`Error processing file ${file.name}:`, error);
@@ -442,7 +442,7 @@ router.post('/', async (req, res) => {
                     for (const link of links) {
                         try {
                             const { content, summary } = await processLink(link);
-                            summaryText += `*${link}*\n${summary}\n\n`;
+                            summaryText += `${link} : \n${summary}\n\n`;
                         } catch (error) {
                             console.error(`Error processing link ${link}:`, error);
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
