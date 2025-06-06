@@ -12,7 +12,7 @@ const fetch = require('node-fetch');
 const sharp = require('sharp');
 
 // Initialize clients
-const notion = new Client({ auth: process.env.NOTION_OAUTH });
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
@@ -37,7 +37,7 @@ function extractLinks(text) {
 // Process Notion links
 async function processNotionLink(url) {
     try {
-        if (!process.env.NOTION_OAUTH) {
+        if (!process.env.NOTION_TOKEN) {
             throw new Error('Notion OAuth is not configured');
         }
 
