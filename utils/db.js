@@ -193,7 +193,7 @@ async function deleteChannelMessages(channelName) {
 }
 
 // Improved search function with filters
-async function searchSimilarMessages(queryText, limit = 5, minSimilarity = 0.7, filters = {}) {
+async function searchSimilarMessages(queryText, limit = 15, minSimilarity = 0.7, filters = {}) {
     try {
         const { channel, user, minDate, maxDate } = filters;
         let whereClause = 'WHERE 1=1';
@@ -267,7 +267,7 @@ async function getRelevantContext(query, maxTokens = 4000) {
         const daysSince = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
         
         // Construct Slack message link
-        const messageLink = `https://${process.env.SLACK_BASE_URI}/${message.channel_name}/p${message.thread_ts.replace('.', '')}`;
+        const messageLink = `${process.env.SLACK_BASE_URI}/${message.channel_name}/p${message.thread_ts.replace('.', '')}`;
         
         // Check for Notion links in the content
         const notionLinks = messageContent.match(/https:\/\/[^/\s]+\.notion\.so\/[^\s]+/g) || [];
