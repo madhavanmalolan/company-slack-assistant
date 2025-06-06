@@ -93,7 +93,6 @@ async function processMessageContent(message, channelId, channelName, channelDes
         let storable = `            
             ${threadContent || message.text}
         `;
-        console.log("Storable after processing images: ", storable);
 
         // Process any files in the message
         if (message.files) {
@@ -168,12 +167,10 @@ const processIncomingMessagePayload = async (event, req) => {
     const userId = event.user;
 
     // Get channel info
-    console.log('Getting channel info...');
     const channelInfo = await slack.conversations.info({ channel: channelId });
     const channelName = channelInfo.channel.name;
     const channelDescription = channelInfo.channel.purpose?.value || 'No description';
     const channelTopic = channelInfo.channel.topic?.value || 'No topic';
-    console.log('Channel info:', channelInfo);
     const message = {
         text: messageText,
         user: userId,
@@ -415,9 +412,10 @@ router.post('/', async (req, res) => {
             default:
                 console.log("Processing incoming message payload : ", JSON.stringify(event));
 
+                let fileSummaryText = "";
                 // Process files in the message
                 if (event.files && event.user !== process.env.SLACK_BOT_ID) {
-                    let fileSummaryText = "Here's a summary of the files in your message:\n\n";
+                    fileSummaryText = "Here's a summary of the files in your message:\n\n";
                     
                     for (const file of event.files) {
                         try {
@@ -433,13 +431,6 @@ router.post('/', async (req, res) => {
                             fileSummaryText += `*${file.name}*\nSorry, I couldn't process this file.\n\n`;
                         }
                     }
-
-                    // Send the file summary as a thread reply with formatting
-                    await slack.chat.postMessage({
-                        channel: event.channel,
-                        thread_ts: event.ts,
-                        blocks: formatMessageWithBlocks(fileSummaryText)
-                    });
                 }
 
                 // Process links in the message
@@ -466,7 +457,7 @@ router.post('/', async (req, res) => {
                     });
                 }
 
-                event.text = event.text + "\n\n" + summaryText;
+                event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 
                 const storable = await processIncomingMessagePayload(event, req);
                 if (storable) {  // Only process if we have content to store
