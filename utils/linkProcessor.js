@@ -51,6 +51,7 @@ async function processNotionLink(url) {
             
             let content = '';
             for (const block of blocks.results) {
+                console.log("block : ", block);
                 if (block.type === 'paragraph') {
                     content += block.paragraph.rich_text.map(text => text.plain_text).join('') + '\n';
                 } else if (block.type === 'table') {
