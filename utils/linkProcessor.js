@@ -651,45 +651,78 @@ async function processGranolaLink(url) {
         const context = await browser.newContext();
         const page = await context.newPage();
         
-        // Navigate to the URL
-        await page.goto(url);
-        
-        // Wait for the content to load
-        await page.waitForSelector('main', { timeout: 10000 });
-        const title = await page.evaluate(() => {
-            return document.querySelector('title').textContent;
-        });
-        
-        // Extract the content
-        const content = await page.evaluate(() => {
-            // Get all text content from the main element
-            const mainElement = document.querySelector('main');
-            if (!mainElement) return '';
-            
-            // Extract text while preserving structure
-            const extractText = (element) => {
-                let text = '';
-                for (const node of element.childNodes) {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        text += node.textContent;
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Add appropriate spacing for block elements
-                        if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
-                            text += '\n';
-                        }
-                        text += extractText(node);
-                        if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
-                            text += '\n';
-                        }
-                    }
-                }
-                return text;
-            };
-            
-            return extractText(mainElement).trim();
+        // Navigate to the URL with increased timeout and wait for network idle
+        await page.goto(url, { 
+            waitUntil: 'networkidle0',
+            timeout: 30000 // 30 second timeout
         });
 
+        // Wait for the loading spinner to disappear
+        try {
+            await page.waitForSelector('.shrink-0.border-2.rounded-full.border-current.border-b-transparent', { 
+                state: 'hidden',
+                timeout: 10000 
+            });
+        } catch (error) {
+            console.warn('Loading spinner not found or did not disappear:', error);
+        }
+
+        // Try to get the title first
+        let title = 'Untitled';
+        try {
+            title = await page.evaluate(() => {
+                return document.querySelector('title')?.textContent || 'Untitled';
+            });
+        } catch (titleError) {
+            console.warn('Error getting page title:', titleError);
+        }
+
+        // Wait for content to be loaded
+        let content = '';
+        try {
+            // Wait for any content to be loaded
+            await page.waitForFunction(() => {
+                const mainContent = document.querySelector('main');
+                return mainContent && mainContent.textContent.trim().length > 0;
+            }, { timeout: 20000 });
+
+            // Extract the content
+            content = await page.evaluate(() => {
+                // Get all text content while preserving structure
+                const extractText = (element) => {
+                    let text = '';
+                    for (const node of element.childNodes) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            text += node.textContent;
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Add appropriate spacing for block elements
+                            if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
+                                text += '\n';
+                            }
+                            text += extractText(node);
+                            if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
+                                text += '\n';
+                            }
+                        }
+                    }
+                    return text;
+                };
+
+                // Try to get content from the main element or fall back to body
+                const mainElement = document.querySelector('main');
+                return extractText(mainElement || document.body).trim();
+            });
+        } catch (contentError) {
+            console.error('Error extracting content:', contentError);
+            // If we can't get structured content, try to get all text
+            content = await page.evaluate(() => document.body.innerText);
+        }
+
         await browser.close();
+
+        if (!content || content.trim().length === 0) {
+            throw new Error('No content could be extracted from the Granola.ai page');
+        }
 
         // Generate a summary using Claude
         const summary = await anthropic.messages.create({
@@ -707,7 +740,7 @@ async function processGranolaLink(url) {
         };
     } catch (error) {
         console.error('Error processing Granola.ai link:', error);
-        throw error;
+        throw new Error(`Failed to process Granola.ai link: ${error.message}`);
     }
 }
 
