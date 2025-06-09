@@ -18,9 +18,15 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
 
 // Initialize Google Drive client
-const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+);
+
+// Set credentials from environment variable
+auth.setCredentials({
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN
 });
 
 const drive = google.drive({ version: 'v3', auth });
@@ -276,63 +282,82 @@ async function processGoogleDriveLink(url) {
             throw new Error('Could not extract file ID from URL');
         }
 
-        // Get file metadata
-        const file = await drive.files.get({
-            fileId: fileId,
-            fields: 'name,mimeType',
-            supportsAllDrives: true
-        });
+        try {
+            // Get file metadata
+            const file = await drive.files.get({
+                fileId: fileId,
+                fields: 'name,mimeType',
+                supportsAllDrives: true
+            });
 
-        let content = '';
-        const title = file.data.name;
+            let content = '';
+            const title = file.data.name;
 
-        // Process based on file type
-        switch (file.data.mimeType) {
-            case 'application/vnd.google-apps.document':
-                const doc = await drive.files.export({
-                    fileId,
-                    mimeType: 'text/plain',
-                    supportsAllDrives: true
-                });
-                content = doc.data;
-                break;
+            // Process based on file type
+            switch (file.data.mimeType) {
+                case 'application/vnd.google-apps.document':
+                    const doc = await drive.files.export({
+                        fileId,
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = doc.data;
+                    break;
 
-            case 'application/vnd.google-apps.spreadsheet':
-                const sheet = await drive.files.export({
-                    fileId,
-                    mimeType: 'text/csv',
-                    supportsAllDrives: true
-                });
-                content = sheet.data;
-                break;
+                case 'application/vnd.google-apps.spreadsheet':
+                    const sheet = await drive.files.export({
+                        fileId,
+                        mimeType: 'text/csv',
+                        supportsAllDrives: true
+                    });
+                    content = sheet.data;
+                    break;
 
-            case 'application/vnd.google-apps.presentation':
-                const slides = await drive.files.export({
-                    fileId,
-                    mimeType: 'text/plain',
-                    supportsAllDrives: true
-                });
-                content = slides.data;
-                break;
+                case 'application/vnd.google-apps.presentation':
+                    const slides = await drive.files.export({
+                        fileId,
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = slides.data;
+                    break;
 
-            default:
-                content = 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
+                default:
+                    content = 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
+            }
+
+            // Generate a summary using Claude
+            const summary = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20240620",
+                max_tokens: 300,
+                messages: [{
+                    role: "user", 
+                    content: `Summarize the key points from this Google Drive content in a concise paragraph:\n${content}`
+                }]
+            });
+
+            return {
+                content: content,
+                summary: title + " : " + summary.content[0].text
+            };
+        } catch (error) {
+            // Check for specific permission errors
+            if (error.code === 403) {
+                if (error.message.includes('insufficientFilePermissions')) {
+                    throw new Error('Google Drive Permission denied: You do not have access to this file. Please ensure the file is shared with the appropriate permissions.');
+                } else if (error.message.includes('insufficientPermissions')) {
+                    throw new Error('Google Drive Permission denied: The service account does not have sufficient permissions to access this file. Please ensure the file is shared with the service account email.');
+                } else if (error.message.includes('notFound')) {
+                    throw new Error('File not found: The requested file does not exist or has been deleted.');
+                } else {
+                    throw new Error(`Permission error: ${error.message}`);
+                }
+            } else if (error.code === 401) {
+                throw new Error('Authentication error: The service account credentials are invalid or have expired.');
+            } else {
+                throw error;
+            }
         }
-
-        // Generate a summary using Claude
-        const summary = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
-            max_tokens: 300,
-            messages: [{
-                role: "user", 
-                content: `Summarize the key points from this Google Drive content in a concise paragraph:\n${content}`
-            }]
-        });
-
-        return {
-            content: content,
-            summary: title + " : " + summary.content[0].text
-        };
     } catch (error) {
         console.error('Error processing Google Drive link:', error);
         throw error;
@@ -705,7 +730,6 @@ async function processLink(url) {
             return await processExternalLink(url);
         }
     } catch (error) {
-        console.error('Error processing link:', error);
         throw error;
     }
 }

@@ -74,14 +74,18 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 if (replyLinks.length > 0) {
                     for (const link of replyLinks) {
                         try {
-                            const { content, summary } = await processLink(link);
+                            const { content, summary, error } = await processLink(link);
                             threadContent += `
                                 --------------------------------
                                 Contents of Link : ${link}
                                 --------------------------------
                                 Summary : ${summary}
+                                --------------------------------
+                                Content : ${content}
                             `;
                         } catch (error) {
+                            if (error.message.includes('Google Drive Permission denied')) {
+                            }
                             console.error(`Error processing link ${link}:`, error);
                         }
                     }
