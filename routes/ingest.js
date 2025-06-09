@@ -80,7 +80,6 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                 Contents of Link : ${link}
                                 --------------------------------
                                 Summary : ${summary}
-                                Content : ${content}
                             `;
                         } catch (error) {
                             console.error(`Error processing link ${link}:`, error);
@@ -132,7 +131,6 @@ async function processMessageContent(message, channelId, channelName, channelDes
                         Contents of Link : ${link}
                         --------------------------------
                         Summary : ${summary}
-                        Content : ${content}
                     `;
                 } catch (error) {
                     console.error(`Error processing link ${link}:`, error);
