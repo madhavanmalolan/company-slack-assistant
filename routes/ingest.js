@@ -367,6 +367,30 @@ router.post('/', async (req, res) => {
                 const taggedMessage = await processIncomingMessagePayload(event, req);
                 console.log('Tagged message:', taggedMessage.substring(0, 40));
                 
+                // Process any links in the message
+                let linkSummaryText = "";
+                const messageLinks = extractLinks(event.text);
+                if (messageLinks.length > 0) {
+                    linkSummaryText = "Here's a summary of the links in your message:\n\n";
+                    for (const link of messageLinks) {
+                        try {
+                            const { content, summary } = await processLink(link);
+                            linkSummaryText += `${link} : \n${summary}\n\n`;
+                        } catch (error) {
+                            console.error(`Error processing link ${link}:`, error);
+                            if (error.message.includes('Google Drive')) {
+                                // Post a message to the thread requesting permissions
+                                await slack.chat.postMessage({
+                                    channel: event.channel,
+                                    thread_ts: event.ts,
+                                    text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions. Once done, please share the link again so that I can learn from it."
+                                });
+                            }
+                            linkSummaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
+                        }
+                    }
+                }
+                
                 // Get relevant context using the new function
                 const context = await getRelevantContext(taggedMessage);
                 
@@ -398,8 +422,10 @@ router.post('/', async (req, res) => {
                 const threadText = threadMessages.join('\n\n');
                 const threadNotionLinks = threadText.match(notionLinkRegex) || [];
                 const allNotionLinks = [...new Set([...contextNotionLinks, ...threadNotionLinks])];
-
-
+                const googleSpreadsheetLinkRegex = /https:\/\/[^\s<>]*docs\.google\.com\/spreadsheets\/[^\s<>]*/g;
+                const contextGoogleSpreadsheetLinks = context.match(googleSpreadsheetLinkRegex) || [];
+                const threadGoogleSpreadsheetLinks = threadText.match(googleSpreadsheetLinkRegex) || [];
+                const allGoogleSpreadsheetLinks = [...new Set([...contextGoogleSpreadsheetLinks, ...threadGoogleSpreadsheetLinks])];
 
                 // Get content from Notion links and add to context
                 if (allNotionLinks.length > 0) {
@@ -415,11 +441,26 @@ router.post('/', async (req, res) => {
                                 }
                             })
                         );
+                        const googleSpreadsheetContents = await Promise.all(
+                            allGoogleSpreadsheetLinks.map(async (link) => {
+                                try {
+                                    const content = await processGoogleSpreadsheetLink(link);
+                                    return `Content from Google Spreadsheet (${link}):\n${content}`;
+                                } catch (error) {
+                                    console.error(`Error processing Google Spreadsheet link ${link}:`, error);
+                                    return '';
+                                }
+                            })
+                        );
 
                         // Add non-empty Notion contents to context
                         const validNotionContents = notionContents.filter(content => content);
                         if (validNotionContents.length > 0) {
                             context += '\n\nAdditional context from Notion pages:\n' + validNotionContents.join('\n\n');
+                        }
+                        const validGoogleSpreadsheetContents = googleSpreadsheetContents.filter(content => content);
+                        if (validGoogleSpreadsheetContents.length > 0) {
+                            context += '\n\nAdditional context from Google Spreadsheets:\n' + validGoogleSpreadsheetContents.join('\n\n');
                         }
                     } catch (error) {
                         console.error('Error processing Notion links:', error);
@@ -440,6 +481,8 @@ router.post('/', async (req, res) => {
                     
                     Current conversation thread:
                     ${threadText}
+                    
+                    ${linkSummaryText ? `Links in the current message:\n${linkSummaryText}` : ''}
                 `;
 
                 try {
@@ -514,18 +557,6 @@ router.post('/', async (req, res) => {
                             console.error(`Error processing link ${link}:`, error);
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
                         }
-                    }
-                }
-                // Post summaries to Slack if we have any
-                if (summaryText || fileSummaryText) {
-                    try {
-                        await slack.chat.postMessage({
-                            channel: event.channel,
-                            thread_ts: event.ts,
-                            blocks: formatMessageWithBlocks(summaryText + fileSummaryText)
-                        });
-                    } catch (error) {
-                        console.error('Error posting summary to Slack:', error);
                     }
                 }
                 // If we processed any files or links, respond with notebook emoji
