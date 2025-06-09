@@ -365,6 +365,20 @@ async function processExternalLink(url) {
         
         // Set a longer timeout for page load
         page.setDefaultTimeout(30000);
+
+        // Collect console errors
+        const consoleErrors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                consoleErrors.push(msg.text());
+            }
+        });
+
+        // Collect page errors
+        const pageErrors = [];
+        page.on('pageerror', error => {
+            pageErrors.push(error.message);
+        });
         
         try {
             // Navigate to the page and wait for network to be idle
@@ -375,6 +389,42 @@ async function processExternalLink(url) {
             
             // Wait for 5 seconds for any additional content to load
             await page.waitForTimeout(5000);
+
+            // Check for client-side errors
+            if (consoleErrors.length > 0 || pageErrors.length > 0) {
+                const errorMessage = [
+                    'Client-side errors detected:',
+                    ...consoleErrors.map(err => `Console: ${err}`),
+                    ...pageErrors.map(err => `Page: ${err}`)
+                ].join('\n');
+                throw new Error(errorMessage);
+            }
+
+            // Check if the page has loaded properly
+            const pageState = await page.evaluate(() => {
+                // Check for common error indicators
+                const errorIndicators = [
+                    document.querySelector('.error'),
+                    document.querySelector('.error-page'),
+                    document.querySelector('[data-error]'),
+                    document.querySelector('body').textContent.includes('Application error'),
+                    document.querySelector('body').textContent.includes('Something went wrong')
+                ];
+                
+                return {
+                    hasError: errorIndicators.some(indicator => indicator),
+                    readyState: document.readyState,
+                    bodyText: document.body.textContent.trim()
+                };
+            });
+
+            if (pageState.hasError) {
+                throw new Error('Page appears to be in an error state');
+            }
+
+            if (pageState.bodyText.length < 50) {
+                throw new Error('Page content appears to be empty or minimal');
+            }
             
             // Find the section with highest text density
             const content = await page.evaluate(() => {
