@@ -668,7 +668,7 @@ async function processGranolaLink(url) {
         }
         console.log("Title : ", title);
         // Extract the content
-        let content = await page.evaluate(() => document.body.innerText);
+        let content = await page.evaluate(() => document.body.innerHTML);
         console.log("Content : ", content);
         
         await browser.close();
