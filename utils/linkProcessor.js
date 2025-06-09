@@ -373,26 +373,8 @@ async function processExternalLink(url) {
                 timeout: 30000 
             });
             
-            // Wait for any dynamic content to load
+            // Wait for 5 seconds for any additional content to load
             await page.waitForTimeout(5000);
-            
-            // Wait for the page to be fully rendered
-            await page.evaluate(() => {
-                return new Promise((resolve) => {
-                    if (document.readyState === 'complete') {
-                        resolve();
-                    } else {
-                        window.addEventListener('load', resolve);
-                    }
-                });
-            });
-            
-            // Additional wait for any client-side rendering
-            await page.waitForFunction(() => {
-                return document.readyState === 'complete' && 
-                       !document.querySelector('.loading') && 
-                       !document.querySelector('.spinner');
-            }, { timeout: 10000 });
             
             // Find the section with highest text density
             const content = await page.evaluate(() => {
