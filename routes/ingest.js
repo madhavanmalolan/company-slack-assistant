@@ -503,10 +503,12 @@ router.post('/', async (req, res) => {
                 if (links.length > 0 && event.user !== process.env.SLACK_BOT_ID) {
                     summaryText = "Here's a summary of the links in your message:\n\n";
                     
+                    let processedLinks = 0;
                     for (const link of links) {
                         try {
                             const { content, summary } = await processLink(link);
                             summaryText += `${link} : \n${summary}\n\n`;
+                            processedLinks++;
                         } catch (error) {
                             console.error(`Error processing link ${link}:`, error);
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
@@ -514,7 +516,7 @@ router.post('/', async (req, res) => {
                     }
                 }
                 // If we processed any files or links, respond with notebook emoji
-                if ((links.length > 0 || (event.files && event.files.length > 0)) && event.user !== process.env.SLACK_BOT_ID) {
+                if (processedLinks == links.length) {
                     try {
                         await slack.reactions.add({
                             channel: event.channel,
