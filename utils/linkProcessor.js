@@ -430,7 +430,7 @@ async function processExternalLink(url) {
             const content = await page.evaluate(() => {
                 // Remove unwanted elements
                 const removeSelectors = [
-                    'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
+                    'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
                     'aside', 'form', 'button', 'input', 'select', 'textarea',
                     '[role="navigation"]', '[role="banner"]', '[role="complementary"]',
                     '[role="contentinfo"]', '[role="form"]', '[role="search"]',
