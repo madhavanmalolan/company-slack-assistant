@@ -393,7 +393,7 @@ async function processExternalLink(url) {
 
         // Get page title
         const title = await page.title();
-
+        console.log("Title : ", title);
         // Find the section with highest text density
         const content = await page.evaluate(() => {
             console.log("Evaluating page : ", document.body.innerHTML);
