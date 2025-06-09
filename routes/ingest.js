@@ -86,12 +86,12 @@ async function processMessageContent(message, channelId, channelName, channelDes
                         } catch (error) {
                             console.log("Error : ", error);
                             if (error.message.includes('Google Drive')) {
-                            // Post a message to the thread requesting permissions
-                            await slack.chat.postMessage({
-                                channel: message.channel,
-                                thread_ts: message.ts,
-                                text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions."
-                            });
+                                // Post a message to the thread requesting permissions
+                                await slack.chat.postMessage({
+                                    channel: channelId,
+                                    thread_ts: message.thread_ts,
+                                    text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions."
+                                });
                             }
                             console.error(`Error processing link ${link}:`, error);
                         }
