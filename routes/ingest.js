@@ -500,10 +500,11 @@ router.post('/', async (req, res) => {
                 // Process links in the message
                 let summaryText = "";
                 const links = extractLinks(event.text);
+                let processedLinks = 0;
+
                 if (links.length > 0 && event.user !== process.env.SLACK_BOT_ID) {
                     summaryText = "Here's a summary of the links in your message:\n\n";
                     
-                    let processedLinks = 0;
                     for (const link of links) {
                         try {
                             const { content, summary } = await processLink(link);
@@ -516,7 +517,7 @@ router.post('/', async (req, res) => {
                     }
                 }
                 // If we processed any files or links, respond with notebook emoji
-                if (processedLinks == links.length) {
+                if (processedLinks == links.length && processedLinks > 0) {
                     try {
                         await slack.reactions.add({
                             channel: event.channel,
