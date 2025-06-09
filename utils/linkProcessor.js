@@ -697,7 +697,7 @@ async function processLink(url) {
     try {
         if (url.includes('notion.so')) {
             return await processNotionLink(url);
-        } else if (url.includes('drive.google.com')) {
+        } else if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
             return await processGoogleDriveLink(url);
         } else if (url.includes('granola.ai')) {
             return await processGranolaLink(url);
