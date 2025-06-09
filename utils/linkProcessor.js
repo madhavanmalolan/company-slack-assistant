@@ -369,7 +369,7 @@ async function processExternalLink(url) {
         try {
             // Navigate to the page and wait for network to be idle
             await page.goto(url, { 
-                waitUntil: ['networkidle0', 'domcontentloaded'],
+                waitUntil: 'networkidle',
                 timeout: 30000 
             });
             
