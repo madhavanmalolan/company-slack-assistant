@@ -448,14 +448,9 @@ router.post('/', async (req, res) => {
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
                         }
                     }
-
-                    // Send the summary as a thread reply with formatting
-                    await slack.chat.postMessage({
-                        channel: event.channel,
-                        thread_ts: event.ts,
-                        blocks: formatMessageWithBlocks(summaryText)
-                    });
                 }
+
+                console.log("Summary text : ", summaryText);
 
                 event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 
