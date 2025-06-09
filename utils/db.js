@@ -51,18 +51,39 @@ async function createMessagesTable() {
     }
 }
 
+// Helper function to estimate tokens more accurately
+function estimateTokens(text) {
+    // OpenAI's tokenizer roughly uses 4 characters per token for English text
+    return Math.ceil(text.length / 4);
+}
+
 // Generate embedding using OpenAI
 async function generateEmbedding(text) {
     try {
-        const maxTokens = 4096;
-        const words = text.split(/\s+/);
-        const truncatedText = words.length > maxTokens ? 
-            words.slice(0, maxTokens).join(' ') : 
-            text;
+        const maxTokens = 8192; // Maximum tokens for text-embedding-ada-002
+        const estimatedTokens = estimateTokens(text);
+        
+        if (estimatedTokens > maxTokens) {
+            // If text is too long, truncate it to fit within token limit
+            const words = text.split(/\s+/);
+            let truncatedText = '';
+            let currentTokens = 0;
+            
+            for (const word of words) {
+                const wordTokens = estimateTokens(word);
+                if (currentTokens + wordTokens > maxTokens) {
+                    break;
+                }
+                truncatedText += word + ' ';
+                currentTokens += wordTokens;
+            }
+            
+            text = truncatedText.trim();
+        }
 
         const response = await openai.embeddings.create({
             model: "text-embedding-ada-002",
-            input: truncatedText,
+            input: text,
             encoding_format: "float"
         });
         return response.data[0].embedding;
@@ -70,12 +91,6 @@ async function generateEmbedding(text) {
         console.error('Error generating embedding:', error);
         throw error;
     }
-}
-
-// Helper function to estimate tokens
-function estimateTokens(text) {
-    // Rough estimate: 1 word ≈ 1.3 tokens
-    return Math.ceil(text.split(/\s+/).length * 1.3);
 }
 
 // Function to split text into chunks
