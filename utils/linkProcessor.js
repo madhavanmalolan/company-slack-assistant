@@ -368,12 +368,14 @@ async function processExternalLink(url) {
                 timeout: 30000 // 30 second timeout
             });
         } catch (navigationError) {
+            console.log("Navigation error : ", navigationError);
             console.error('Navigation error:', navigationError);
             throw new Error(`Failed to load the webpage: ${navigationError.message}`);
         }
         
         // Find the section with highest text density
         const content = await page.evaluate(() => {
+            console.log("Evaluating page : ", document.body.innerHTML);
             // Remove unwanted elements
             const removeSelectors = [
                 'script', 'style', 'nav', 'header', 'footer', 
