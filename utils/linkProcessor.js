@@ -444,6 +444,7 @@ async function processExternalLink(url) {
             throw new Error('No meaningful content found on the webpage');
         }
         
+        console.log("Content : ", content);
         return content;
     } catch (error) {
         console.error('Error processing external link:', error);
