@@ -74,10 +74,10 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 if (replyLinks.length > 0) {
                     for (const link of replyLinks) {
                         try {
-                            const { content, summary } = await processLink(link);
+                            const { content, summary, title } = await processLink(link);
                             threadContent += `
                                 --------------------------------
-                                Contents of Link : ${link}
+                                Contents of Link : ${link} (${title})
                                 --------------------------------
                                 Summary : ${summary}
                             `;
@@ -122,20 +122,25 @@ async function processMessageContent(message, channelId, channelName, channelDes
 
         // Process any links in the message
         const links = extractLinks(message.text);
-        if (links.length > 0) {
+        if (links.length > 0 && message.user !== process.env.SLACK_BOT_ID) {
+            let summaryText = "Here's a summary of the links in your message:\n\n";
+            
             for (const link of links) {
                 try {
-                    const { content, summary } = await processLink(link);
-                    storable += `
-                        --------------------------------
-                        Contents of Link : ${link}
-                        --------------------------------
-                        Summary : ${summary}
-                    `;
+                    const { content, summary, title } = await processLink(link);
+                    summaryText += `${link} (${title}) : \n${summary}\n\n`;
                 } catch (error) {
                     console.error(`Error processing link ${link}:`, error);
+                    summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
                 }
             }
+
+            storable += `
+                --------------------------------
+                Links Summary:
+                --------------------------------
+                ${summaryText}
+            `;
         }
 
         return storable;
@@ -381,6 +386,37 @@ router.post('/', async (req, res) => {
                     }
                 }));
 
+                // Extract Notion links from context and thread text
+                const notionLinkRegex = /https:\/\/[^\s<>]*notion\.so\/[^\s<>]*/g;
+                const contextNotionLinks = context.match(notionLinkRegex) || [];
+                const threadNotionLinks = threadText.match(notionLinkRegex) || [];
+                const allNotionLinks = [...new Set([...contextNotionLinks, ...threadNotionLinks])];
+
+                // Get content from Notion links and add to context
+                if (allNotionLinks.length > 0) {
+                    try {
+                        const notionContents = await Promise.all(
+                            allNotionLinks.map(async (link) => {
+                                try {
+                                    const content = await processNotionLink(link);
+                                    return `Content from Notion page (${link}):\n${content}`;
+                                } catch (error) {
+                                    console.error(`Error processing Notion link ${link}:`, error);
+                                    return '';
+                                }
+                            })
+                        );
+
+                        // Add non-empty Notion contents to context
+                        const validNotionContents = notionContents.filter(content => content);
+                        if (validNotionContents.length > 0) {
+                            context += '\n\nAdditional context from Notion pages:\n' + validNotionContents.join('\n\n');
+                        }
+                    } catch (error) {
+                        console.error('Error processing Notion links:', error);
+                    }
+                }
+
                 const threadText = threadMessages.join('\n\n');
                 const fullContext = `
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response.
@@ -461,8 +497,8 @@ router.post('/', async (req, res) => {
                     
                     for (const link of links) {
                         try {
-                            const { content, summary } = await processLink(link);
-                            summaryText += `${link} : \n${summary}\n\n`;
+                            const { content, summary, title } = await processLink(link);
+                            summaryText += `${link} (${title}) : \n${summary}\n\n`;
                         } catch (error) {
                             console.error(`Error processing link ${link}:`, error);
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
