@@ -650,13 +650,13 @@ async function processGranolaLink(url) {
         const browser = await chromium.launch();
         const context = await browser.newContext();
         const page = await context.newPage();
-        
+        console.log("Navigating to URL : ", url);
         // Navigate to the URL and wait for network idle
         await page.goto(url, { 
             waitUntil: 'networkidle0',
-            timeout: 30000 // 30 second timeout
+            timeout: 10000 // 10 second timeout
         });
-
+        console.log("Navigated to URL : ", url);
         // Try to get the title first
         let title = 'Untitled';
         try {
@@ -666,9 +666,10 @@ async function processGranolaLink(url) {
         } catch (titleError) {
             console.warn('Error getting page title:', titleError);
         }
-
+        console.log("Title : ", title);
         // Extract the content
         let content = await page.evaluate(() => document.body.innerText);
+        console.log("Content : ", content);
         
         await browser.close();
 
