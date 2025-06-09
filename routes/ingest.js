@@ -74,7 +74,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 if (replyLinks.length > 0) {
                     for (const link of replyLinks) {
                         try {
-                            const { content, summary, error } = await processLink(link);
+                            const { content, summary } = await processLink(link);
                             threadContent += `
                                 --------------------------------
                                 Contents of Link : ${link}
@@ -84,6 +84,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                 Content : ${content}
                             `;
                         } catch (error) {
+                            console.log("Error : ", error);
                             if (error.message.includes('Google Drive')) {
                             // Post a message to the thread requesting permissions
                             await slack.chat.postMessage({
