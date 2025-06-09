@@ -356,6 +356,7 @@ async function processGoogleDriveLink(url) {
 
 // Process external website links
 async function processExternalLink(url) {
+    console.log("Processing external link : ", url);
     try {
         const browser = await chromium.launch();
         const context = await browser.newContext();
@@ -428,6 +429,8 @@ async function processExternalLink(url) {
             if (!bestContainer || highestScore < 0.0001) {
                 bestContainer = document.body;
             }
+
+            console.log("Best container : ", bestContainer);
 
             // Get the text content
             return bestContainer.textContent.trim();
