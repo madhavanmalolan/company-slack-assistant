@@ -384,8 +384,11 @@ router.post('/', async (req, res) => {
                 // Extract Notion links from context and thread text
                 const notionLinkRegex = /https:\/\/[^\s<>]*notion\.so\/[^\s<>]*/g;
                 const contextNotionLinks = context.match(notionLinkRegex) || [];
+                const threadText = threadMessages.join('\n\n');
                 const threadNotionLinks = threadText.match(notionLinkRegex) || [];
                 const allNotionLinks = [...new Set([...contextNotionLinks, ...threadNotionLinks])];
+
+
 
                 // Get content from Notion links and add to context
                 if (allNotionLinks.length > 0) {
@@ -412,7 +415,6 @@ router.post('/', async (req, res) => {
                     }
                 }
 
-                const threadText = threadMessages.join('\n\n');
                 const fullContext = `
                     You are a helpful assistant that can answer questions about the following context that you may use to answer the question, but also feel free to pull information from other sources including the internet. If you are using information from a link, make sure to include the link in your response.
                     
