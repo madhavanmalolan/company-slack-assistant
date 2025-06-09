@@ -513,6 +513,18 @@ router.post('/', async (req, res) => {
                         }
                     }
                 }
+                // If we processed any files or links, respond with notebook emoji
+                if ((links.length > 0 || (event.files && event.files.length > 0)) && event.user !== process.env.SLACK_BOT_ID) {
+                    try {
+                        await slack.reactions.add({
+                            channel: event.channel,
+                            name: 'notebook',
+                            timestamp: event.ts
+                        });
+                    } catch (error) {
+                        console.error('Error adding notebook reaction:', error);
+                    }
+                }
 
                 console.log("Summary text : ", summaryText);
 
@@ -525,12 +537,6 @@ router.post('/', async (req, res) => {
                     const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
                     const senderTitle = userInfo.user.profile.title || 'No title';
                     await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle, event.ts);
-
-                    await slack.chat.postMessage({
-                        channel: event.channel,
-                        thread_ts: event.ts,
-                        blocks: formatMessageWithBlocks(storable)
-                    });
                 }
         }
     } catch (error) {
