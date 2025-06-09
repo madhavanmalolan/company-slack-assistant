@@ -682,43 +682,8 @@ async function processGranolaLink(url) {
         }
 
         // Extract the content
-        let content = '';
-        try {
-            content = await page.evaluate(() => {
-                // Get all text content while preserving structure
-                const extractText = (element) => {
-                    let text = '';
-                    for (const node of element.childNodes) {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            text += node.textContent;
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                            // Add appropriate spacing for block elements
-                            if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
-                                text += '\n';
-                            }
-                            text += extractText(node);
-                            if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
-                                text += '\n';
-                            }
-                        }
-                    }
-                    return text;
-                };
-
-                // Try to get content from the main element or fall back to body
-                const mainElement = document.querySelector('main');
-                if (!mainElement) {
-                    console.warn('Main element not found, falling back to body');
-                    return extractText(document.body).trim();
-                }
-                return extractText(mainElement).trim();
-            });
-        } catch (contentError) {
-            console.error('Error extracting content:', contentError);
-            // If we can't get structured content, try to get all text
-            content = await page.evaluate(() => document.body.innerText);
-        }
-
+        let content = await page.evaluate(() => document.body.innerText);
+        
         await browser.close();
 
         if (!content || content.trim().length === 0) {
