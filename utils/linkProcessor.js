@@ -657,20 +657,6 @@ async function processGranolaLink(url) {
             timeout: 30000 // 30 second timeout
         });
 
-        // Wait for the Next.js hydration to complete
-        await page.waitForFunction(() => {
-            // Check if Next.js has finished loading
-            return !document.querySelector('script[src*="next"]') || 
-                   document.readyState === 'complete';
-        }, { timeout: 20000 });
-
-        // Wait for the main content to be rendered
-        await page.waitForFunction(() => {
-            const main = document.querySelector('main');
-            return main && main.textContent.trim().length > 0 && 
-                   !main.querySelector('.animate-spin'); // Ensure loading spinner is gone
-        }, { timeout: 20000 });
-
         // Try to get the title first
         let title = 'Untitled';
         try {
