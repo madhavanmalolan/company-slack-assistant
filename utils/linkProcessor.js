@@ -651,21 +651,25 @@ async function processGranolaLink(url) {
         const context = await browser.newContext();
         const page = await context.newPage();
         
-        // Navigate to the URL with increased timeout and wait for network idle
+        // Navigate to the URL and wait for network idle
         await page.goto(url, { 
             waitUntil: 'networkidle0',
             timeout: 30000 // 30 second timeout
         });
 
-        // Wait for the loading spinner to disappear
-        try {
-            await page.waitForSelector('.shrink-0.border-2.rounded-full.border-current.border-b-transparent', { 
-                state: 'hidden',
-                timeout: 10000 
-            });
-        } catch (error) {
-            console.warn('Loading spinner not found or did not disappear:', error);
-        }
+        // Wait for the Next.js hydration to complete
+        await page.waitForFunction(() => {
+            // Check if Next.js has finished loading
+            return !document.querySelector('script[src*="next"]') || 
+                   document.readyState === 'complete';
+        }, { timeout: 20000 });
+
+        // Wait for the main content to be rendered
+        await page.waitForFunction(() => {
+            const main = document.querySelector('main');
+            return main && main.textContent.trim().length > 0 && 
+                   !main.querySelector('.animate-spin'); // Ensure loading spinner is gone
+        }, { timeout: 20000 });
 
         // Try to get the title first
         let title = 'Untitled';
@@ -677,16 +681,9 @@ async function processGranolaLink(url) {
             console.warn('Error getting page title:', titleError);
         }
 
-        // Wait for content to be loaded
+        // Extract the content
         let content = '';
         try {
-            // Wait for any content to be loaded
-            await page.waitForFunction(() => {
-                const mainContent = document.querySelector('main');
-                return mainContent && mainContent.textContent.trim().length > 0;
-            }, { timeout: 20000 });
-
-            // Extract the content
             content = await page.evaluate(() => {
                 // Get all text content while preserving structure
                 const extractText = (element) => {
@@ -710,7 +707,11 @@ async function processGranolaLink(url) {
 
                 // Try to get content from the main element or fall back to body
                 const mainElement = document.querySelector('main');
-                return extractText(mainElement || document.body).trim();
+                if (!mainElement) {
+                    console.warn('Main element not found, falling back to body');
+                    return extractText(document.body).trim();
+                }
+                return extractText(mainElement).trim();
             });
         } catch (contentError) {
             console.error('Error extracting content:', contentError);
