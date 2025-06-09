@@ -451,6 +451,15 @@ router.post('/', async (req, res) => {
                 }
 
                 console.log("Summary text : ", summaryText);
+                
+                // Send file summary to Slack if we processed any files
+                if (summaryText) {
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        thread_ts: event.ts,
+                        blocks: formatMessageWithBlocks(summaryText)
+                    });
+                }
 
                 event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 
