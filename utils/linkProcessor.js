@@ -384,26 +384,67 @@ async function processExternalLink(url) {
         const page = await context.newPage();
         
         try {
-            await page.goto(url, { waitUntil: 'networkidle' });
+            await page.goto(url, { 
+                waitUntil: 'networkidle',
+                timeout: 30000 // 30 second timeout
+            });
         } catch (navigationError) {
             console.log("Navigation error : ", navigationError);
-            console.error('Navigation error:', navigationError);
+            await browser.close();
             throw new Error(`Failed to load the webpage: ${navigationError.message}`);
+        }
+
+        // Check for common error pages
+        const errorContent = await page.evaluate(() => {
+            const errorIndicators = [
+                'Application error',
+                'Error loading page',
+                'Page not found',
+                '404',
+                '500',
+                'Internal Server Error',
+                'Service Unavailable',
+                'Access Denied',
+                'Forbidden'
+            ];
+            
+            const pageText = document.body.innerText.toLowerCase();
+            const foundErrors = errorIndicators.filter(indicator => 
+                pageText.includes(indicator.toLowerCase())
+            );
+            
+            if (foundErrors.length > 0) {
+                return {
+                    isError: true,
+                    errorType: foundErrors[0],
+                    errorMessage: document.body.innerText.trim()
+                };
+            }
+            
+            return { isError: false };
+        });
+
+        if (errorContent.isError) {
+            await browser.close();
+            throw new Error(`Webpage returned an error: ${errorContent.errorType}. ${errorContent.errorMessage}`);
         }
 
         // Get page title
         const title = await page.title();
-        console.log("Title : ", title);
+        if (!title || title.toLowerCase().includes('error') || title.toLowerCase().includes('not found')) {
+            await browser.close();
+            throw new Error(`Invalid page title detected: ${title}`);
+        }
+
         // Find the section with highest text density
         const content = await page.evaluate(() => {
             console.log("Evaluating page : ", document.body.innerHTML);
             // Remove unwanted elements
-            const removeSelectors = [];
-            /*[
+            const removeSelectors = [
                 'script', 'style', 'nav', 'header', 'footer', 
                 'aside', 'iframe', 'noscript', 'svg', 'form',
                 'button', 'input', 'select', 'textarea'
-            ];*/
+            ];
             removeSelectors.forEach(selector => {
                 document.querySelectorAll(selector).forEach(el => el.remove());
             });
@@ -430,10 +471,21 @@ async function processExternalLink(url) {
             console.log("Best container : ", bestContainer);
 
             // Get the text content
-            return bestContainer.innerText.trim();
+            const text = bestContainer.innerText.trim();
+            
+            // Check if we got meaningful content
+            if (!text || text.length < 50) {
+                return null;
+            }
+            
+            return text;
         });
 
         await browser.close();
+
+        if (!content) {
+            throw new Error('No meaningful content found on the webpage');
+        }
 
         // Generate summary using Claude
         const summary = await anthropic.messages.create({
@@ -452,7 +504,12 @@ async function processExternalLink(url) {
         };
     } catch (error) {
         console.error('Error processing external link:', error);
-        throw error;
+        // Return a more user-friendly error message
+        return {
+            content: `Error: ${error.message}`,
+            summary: `Unable to process this link: ${error.message}`,
+            title: 'Error Processing Link'
+        };
     }
 }
 
