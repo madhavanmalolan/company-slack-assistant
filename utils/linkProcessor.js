@@ -682,7 +682,7 @@ async function processGranolaLink(url) {
             max_tokens: 300,
             messages: [{
                 role: "user",
-                content: `Summarize the key points from this content in a concise paragraph:\n${content}`
+                content: `Summarize the key points from this content in a concise paragraph, remember to make sure you include any action items or next steps:\n${content}`
             }]
         });
 
