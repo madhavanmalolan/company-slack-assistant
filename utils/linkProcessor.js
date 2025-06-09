@@ -52,7 +52,6 @@ async function processNotionLink(url) {
             let content = '';
             for (const block of blocks.results) {
                 if (block.type === 'paragraph') {
-                    console.log("p block : ", block);
                     content += block.paragraph.rich_text.map(text => text.plain_text).join('') + '\n';
                 } else if (block.type === 'table') {
                     // Get table rows
@@ -239,6 +238,7 @@ async function processNotionLink(url) {
                     }
                 }
             }
+            console.log("content : ", content);
             return title + " : " + content;
         } catch (apiError) {
             if (apiError.code === 'unauthorized' || apiError.message.includes('API token is invalid')) {
