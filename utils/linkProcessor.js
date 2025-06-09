@@ -238,8 +238,20 @@ async function processNotionLink(url) {
                     }
                 }
             }
-            console.log("content : ", content);
-            return title + " : " + content;
+            // Generate summary using Claude
+            const summary = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20240620",
+                max_tokens: 300,
+                messages: [{
+                    role: "user",
+                    content: `Summarize the key points from this content in a concise paragraph:\n${content}`
+                }]
+            });
+
+            return {
+                content: content,
+                summary: summary.content[0].text
+            };
         } catch (apiError) {
             if (apiError.code === 'unauthorized' || apiError.message.includes('API token is invalid')) {
                 throw new Error('Notion API authentication failed. Please check the API key configuration.');
@@ -345,6 +357,20 @@ async function processGoogleDriveLink(url) {
                     content += `Type: ${file.data.mimeType}\n`;
                     content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
             }
+            // Generate a summary using Claude
+            const summary = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20240620",
+                max_tokens: 300,
+                messages: [{
+                    role: "user", 
+                    content: `Summarize the key points from this Google Drive content in a concise paragraph:\n${content}`
+                }]
+            });
+
+            return {
+                content: content,
+                summary: summary.content[0].text
+            };
             return content;
         } catch (error) {
             if (error.code === 404) {
@@ -451,9 +477,21 @@ async function processExternalLink(url) {
         if (!content || content.trim().length === 0) {
             throw new Error('No meaningful content found on the webpage');
         }
-        
-        console.log("Content : ", content);
-        return title + " : " + content;
+
+        // Generate a summary using Claude
+        const summary = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 300,
+            messages: [{
+                role: "user", 
+                content: `Summarize the key points from this content in a concise paragraph:\n${content}`
+            }]
+        });
+
+        return {
+            content: content,
+            summary: title + " : " + summary.content[0].text
+        };
     } catch (error) {
         console.error('Error processing external link:', error);
         throw new Error(`Failed to process external link: ${error.message}`);
