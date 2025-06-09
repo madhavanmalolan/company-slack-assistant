@@ -451,13 +451,6 @@ router.post('/', async (req, res) => {
                 }
 
                 console.log("Summary text : ", summaryText);
-                if(summaryText) {
-                    await slack.chat.postMessage({
-                        channel: event.channel,
-                        thread_ts: event.ts,
-                        blocks: formatMessageWithBlocks(summaryText)
-                    });
-                }
 
                 event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 
@@ -468,6 +461,12 @@ router.post('/', async (req, res) => {
                     const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : event.user;
                     const senderTitle = userInfo.user.profile.title || 'No title';
                     await chunkAndStoreMessage(channelId, threadTs, storable, senderName, senderTitle, event.ts);
+
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        thread_ts: event.ts,
+                        blocks: formatMessageWithBlocks(storable)
+                    });
                 }
         }
     } catch (error) {
