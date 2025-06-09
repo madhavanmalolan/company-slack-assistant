@@ -377,11 +377,12 @@ async function processExternalLink(url) {
         const content = await page.evaluate(() => {
             console.log("Evaluating page : ", document.body.innerHTML);
             // Remove unwanted elements
-            const removeSelectors = [
+            const removeSelectors = [];
+            /*[
                 'script', 'style', 'nav', 'header', 'footer', 
                 'aside', 'iframe', 'noscript', 'svg', 'form',
                 'button', 'input', 'select', 'textarea'
-            ];
+            ];*/
             removeSelectors.forEach(selector => {
                 document.querySelectorAll(selector).forEach(el => el.remove());
             });
