@@ -349,7 +349,7 @@ async function processGoogleDriveLink(url) {
             } else if (error.code === 401) {
                 throw new Error('Google Drive Authentication error: The service account credentials are invalid or have expired. Please check your google.json configuration.');
             } else {
-                throw error;
+                throw new Error(`Google Drive Error: ${error.message}`);
             }
         }
     } catch (error) {
