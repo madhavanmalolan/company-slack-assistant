@@ -43,9 +43,11 @@ async function processNotionLink(url) {
 
         const pageId = url.split('-').pop().split('?')[0].replace(">", "").replace("<", "");
         try {
+            console.log("Processing Notion link : ", url);
             const page = await notion.pages.retrieve({ page_id: pageId });
             const title = page.properties.title?.title[0]?.plain_text || 'Untitled';
             const blocks = await notion.blocks.children.list({ block_id: pageId });
+            console.log("title : ", title);
             
             let content = '';
             for (const block of blocks.results) {
