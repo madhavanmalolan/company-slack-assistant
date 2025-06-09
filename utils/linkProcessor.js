@@ -270,117 +270,72 @@ async function processNotionLink(url) {
 // Process Google Drive links
 async function processGoogleDriveLink(url) {
     try {
-        // Extract file ID using more robust regex
-        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/) || 
-                          url.match(/id=([a-zA-Z0-9-_]+)/) ||
-                          url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
-        
-        if (!fileIdMatch) {
-            throw new Error('Could not extract file ID from Google Drive URL');
+        // Extract file ID from the URL
+        const fileId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+        if (!fileId) {
+            throw new Error('Could not extract file ID from URL');
         }
-        
-        const fileId = fileIdMatch[1];
-        
-        try {
-            const file = await drive.files.get({ 
-                fileId, 
-                fields: 'mimeType, name, description',
-                supportsAllDrives: true
-            });
 
-            let content = '';
-            switch (file.data.mimeType) {
-                case 'application/vnd.google-apps.document':
-                    const doc = await drive.files.export({ 
-                        fileId, 
-                        mimeType: 'text/plain',
-                        supportsAllDrives: true
-                    });
-                    content = doc.data;
-                    break;
-                case 'application/vnd.google-apps.spreadsheet':
-                    const sheet = await drive.files.export({ 
-                        fileId, 
-                        mimeType: 'text/csv',
-                        supportsAllDrives: true
-                    });
-                    
-                    // Parse CSV content
-                    const rows = sheet.data.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-                    if (rows.length > 0) {
-                        const headers = rows[0];
-                        let spreadsheetContent = `[Spreadsheet: ${file.data.name}\n`;
-                        spreadsheetContent += `Columns: ${headers.join(', ')}\n\n`;
-                        
-                        // Process each row (skip header)
-                        for (let i = 1; i < rows.length; i++) {
-                            const row = rows[i];
-                            if (row.length === headers.length) {
-                                // Create a row object with headers
-                                const rowData = {};
-                                headers.forEach((header, index) => {
-                                    rowData[header] = row[index];
-                                });
-                                
-                                // Generate summary for the row
-                                const rowSummary = await anthropic.messages.create({
-                                    model: "claude-3-5-sonnet-20240620",
-                                    max_tokens: 100,
-                                    messages: [{
-                                        role: "user",
-                                        content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a Google Spreadsheet:\nSpreadsheet: ${file.data.name}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
-                                    }]
-                                });
-                                
-                                spreadsheetContent += `${rowSummary.content[0].text}\n`;
-                            }
-                        }
-                        
-                        spreadsheetContent += `]\n`;
-                        content = spreadsheetContent;
-                    }
-                    break;
-                case 'application/vnd.google-apps.presentation':
-                    const slides = await drive.files.export({ 
-                        fileId, 
-                        mimeType: 'text/plain',
-                        supportsAllDrives: true
-                    });
-                    content = slides.data;
-                    break;
-                default:
-                    // For non-Google Workspace files, try to get the file name and description
-                    content = `File Name: ${file.data.name}\n`;
-                    if (file.data.description) {
-                        content += `Description: ${file.data.description}\n`;
-                    }
-                    content += `Type: ${file.data.mimeType}\n`;
-                    content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
-            }
-            // Generate a summary using Claude
-            const summary = await anthropic.messages.create({
-                model: "claude-3-5-sonnet-20240620",
-                max_tokens: 300,
-                messages: [{
-                    role: "user", 
-                    content: `Summarize the key points from this Google Drive content in a concise paragraph:\n${content}`
-                }]
-            });
+        // Get file metadata
+        const file = await drive.files.get({
+            fileId: fileId,
+            fields: 'name,mimeType',
+            supportsAllDrives: true
+        });
 
-            return {
-                content: content,
-                summary: summary.content[0].text
-            };
-            return content;
-        } catch (error) {
-            if (error.code === 404) {
-                return 'File not found or not accessible. Please check the file permissions in Google Drive.';
-            }
-            throw error;
+        let content = '';
+        const title = file.data.name;
+
+        // Process based on file type
+        switch (file.data.mimeType) {
+            case 'application/vnd.google-apps.document':
+                const doc = await drive.files.export({
+                    fileId,
+                    mimeType: 'text/plain',
+                    supportsAllDrives: true
+                });
+                content = doc.data;
+                break;
+
+            case 'application/vnd.google-apps.spreadsheet':
+                const sheet = await drive.files.export({
+                    fileId,
+                    mimeType: 'text/csv',
+                    supportsAllDrives: true
+                });
+                content = sheet.data;
+                break;
+
+            case 'application/vnd.google-apps.presentation':
+                const slides = await drive.files.export({
+                    fileId,
+                    mimeType: 'text/plain',
+                    supportsAllDrives: true
+                });
+                content = slides.data;
+                break;
+
+            default:
+                content = 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
         }
+
+        // Generate a summary using Claude
+        const summary = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 300,
+            messages: [{
+                role: "user", 
+                content: `Summarize the key points from this Google Drive content in a concise paragraph:\n${content}`
+            }]
+        });
+
+        return {
+            content: content,
+            summary: title + " : " + summary.content[0].text
+        };
     } catch (error) {
         console.error('Error processing Google Drive link:', error);
-        return 'Unable to process Google Drive link. Please ensure the file is accessible and the link is correct.';
+        throw error;
     }
 }
 
