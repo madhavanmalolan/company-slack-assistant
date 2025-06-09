@@ -516,6 +516,18 @@ router.post('/', async (req, res) => {
                         }
                     }
                 }
+                // Post summaries to Slack if we have any
+                if (summaryText || fileSummaryText) {
+                    try {
+                        await slack.chat.postMessage({
+                            channel: event.channel,
+                            thread_ts: event.ts,
+                            blocks: formatMessageWithBlocks(summaryText + fileSummaryText)
+                        });
+                    } catch (error) {
+                        console.error('Error posting summary to Slack:', error);
+                    }
+                }
                 // If we processed any files or links, respond with notebook emoji
                 if (processedLinks == links.length && processedLinks > 0) {
                     try {
