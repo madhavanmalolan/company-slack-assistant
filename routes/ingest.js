@@ -84,7 +84,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                 Content : ${content}
                             `;
                         } catch (error) {
-                            if (error.message.includes('Google Drive Permission denied')) {
+                            if (error.message.includes('Google Drive')) {
                             // Post a message to the thread requesting permissions
                             await slack.chat.postMessage({
                                 channel: message.channel,

@@ -342,9 +342,9 @@ async function processGoogleDriveLink(url) {
                 } else if (error.message.includes('insufficientPermissions')) {
                     throw new Error('Google Drive Permission denied: The service account does not have sufficient permissions to access this file. Please ensure the file is shared with the service account email.');
                 } else if (error.message.includes('notFound')) {
-                    throw new Error('File not found: The requested file does not exist or has been deleted.');
+                    throw new Error('Google Drive File not found: The requested file does not exist or has been deleted.');
                 } else {
-                    throw new Error(`Permission error: ${error.message}`);
+                    throw new Error(`Google Drive Permission error: ${error.message}`);
                 }
             } else if (error.code === 401) {
                 throw new Error('Google Drive Authentication error: The service account credentials are invalid or have expired. Please check your google.json configuration.');
