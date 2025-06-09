@@ -85,6 +85,12 @@ async function processMessageContent(message, channelId, channelName, channelDes
                             `;
                         } catch (error) {
                             if (error.message.includes('Google Drive Permission denied')) {
+                            // Post a message to the thread requesting permissions
+                            await slack.chat.postMessage({
+                                channel: message.channel,
+                                thread_ts: message.ts,
+                                text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions."
+                            });
                             }
                             console.error(`Error processing link ${link}:`, error);
                         }

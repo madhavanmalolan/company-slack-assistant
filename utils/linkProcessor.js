@@ -18,15 +18,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const slack = new WebClient(process.env.SLACK_BOT_OAUTH);
 
 // Initialize Google Drive client
-const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-);
-
-// Set credentials from environment variable
-auth.setCredentials({
-    refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+const auth = new google.auth.GoogleAuth({
+    keyFile: 'google.json',
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
 });
 
 const drive = google.drive({ version: 'v3', auth });
@@ -353,7 +347,7 @@ async function processGoogleDriveLink(url) {
                     throw new Error(`Permission error: ${error.message}`);
                 }
             } else if (error.code === 401) {
-                throw new Error('Authentication error: The service account credentials are invalid or have expired.');
+                throw new Error('Google Drive Authentication error: The service account credentials are invalid or have expired. Please check your google.json configuration.');
             } else {
                 throw error;
             }
