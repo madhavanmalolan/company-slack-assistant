@@ -74,10 +74,10 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 if (replyLinks.length > 0) {
                     for (const link of replyLinks) {
                         try {
-                            const { content, summary, title } = await processLink(link);
+                            const { content, summary } = await processLink(link);
                             threadContent += `
                                 --------------------------------
-                                Contents of Link : ${link} (${title})
+                                Contents of Link : ${link}
                                 --------------------------------
                                 Summary : ${summary}
                             `;
@@ -122,25 +122,20 @@ async function processMessageContent(message, channelId, channelName, channelDes
 
         // Process any links in the message
         const links = extractLinks(message.text);
-        if (links.length > 0 && message.user !== process.env.SLACK_BOT_ID) {
-            let summaryText = "Here's a summary of the links in your message:\n\n";
-            
+        if (links.length > 0) {
             for (const link of links) {
                 try {
-                    const { content, summary, title } = await processLink(link);
-                    summaryText += `${link} (${title}) : \n${summary}\n\n`;
+                    const { content, summary } = await processLink(link);
+                    storable += `
+                        --------------------------------
+                        Contents of Link : ${link}
+                        --------------------------------
+                        Summary : ${summary}
+                    `;
                 } catch (error) {
                     console.error(`Error processing link ${link}:`, error);
-                    summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;
                 }
             }
-
-            storable += `
-                --------------------------------
-                Links Summary:
-                --------------------------------
-                ${summaryText}
-            `;
         }
 
         return storable;
@@ -497,8 +492,8 @@ router.post('/', async (req, res) => {
                     
                     for (const link of links) {
                         try {
-                            const { content, summary, title } = await processLink(link);
-                            summaryText += `${link} (${title}) : \n${summary}\n\n`;
+                            const { content, summary } = await processLink(link);
+                            summaryText += `${link} : \n${summary}\n\n`;
                         } catch (error) {
                             console.error(`Error processing link ${link}:`, error);
                             summaryText += `*${link}*\nSorry, I couldn't process this link.\n\n`;

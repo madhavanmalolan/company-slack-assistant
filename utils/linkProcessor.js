@@ -47,8 +47,6 @@ async function processNotionLink(url) {
             const blocks = await notion.blocks.children.list({ block_id: pageId });
             
             let content = '';
-            const title = page.properties.title?.title[0]?.plain_text || 'Untitled';
-
             for (const block of blocks.results) {
                 if (block.type === 'paragraph') {
                     content += block.paragraph.rich_text.map(text => text.plain_text).join('') + '\n';
@@ -84,7 +82,7 @@ async function processNotionLink(url) {
                                 max_tokens: 100,
                                 messages: [{
                                     role: "user",
-                                    content: `Using the column titles as context, summarize this table row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a table in the Notion page:\nPage: ${title}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
+                                    content: `Using the column titles as context, summarize this table row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a table in the Notion page:\nPage: ${page.properties.title?.title[0]?.plain_text || 'Untitled'}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
                                 }]
                             });
                             
@@ -185,7 +183,7 @@ async function processNotionLink(url) {
                                 max_tokens: 100,
                                 messages: [{
                                     role: "user",
-                                    content: `Using the property names as context, summarize this database item in one concise sentence. Make sure to reference the property names in your summary and mention this is from a database in the Notion page:\nPage: ${title}\nProperties: ${propertyNames.join(', ')}\nItem Data: ${JSON.stringify(pageData, null, 2)}`
+                                    content: `Using the property names as context, summarize this database item in one concise sentence. Make sure to reference the property names in your summary and mention this is from a database in the Notion page:\nPage: ${page.properties.title?.title[0]?.plain_text || 'Untitled'}\nProperties: ${propertyNames.join(', ')}\nItem Data: ${JSON.stringify(pageData, null, 2)}`
                                 }]
                             });
                             
@@ -237,22 +235,7 @@ async function processNotionLink(url) {
                     }
                 }
             }
-
-            // Generate summary using Claude
-            const summary = await anthropic.messages.create({
-                model: "claude-3-5-sonnet-20240620",
-                max_tokens: 300,
-                messages: [{
-                    role: "user",
-                    content: `Summarize the key points from this Notion page in a concise paragraph:\n${content}`
-                }]
-            });
-
-            return {
-                content,
-                summary: summary.content[0].text,
-                title
-            };
+            return content;
         } catch (apiError) {
             if (apiError.code === 'unauthorized' || apiError.message.includes('API token is invalid')) {
                 throw new Error('Notion API authentication failed. Please check the API key configuration.');
@@ -271,107 +254,103 @@ async function processNotionLink(url) {
 // Process Google Drive links
 async function processGoogleDriveLink(url) {
     try {
-        const fileId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-        if (!fileId) {
-            throw new Error('Invalid Google Drive URL');
+        // Extract file ID using more robust regex
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/) || 
+                          url.match(/id=([a-zA-Z0-9-_]+)/) ||
+                          url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+        
+        if (!fileIdMatch) {
+            throw new Error('Could not extract file ID from Google Drive URL');
         }
+        
+        const fileId = fileIdMatch[1];
+        
+        try {
+            const file = await drive.files.get({ 
+                fileId, 
+                fields: 'mimeType, name, description',
+                supportsAllDrives: true
+            });
 
-        const file = await drive.files.get({
-            fileId,
-            fields: 'name,mimeType',
-            supportsAllDrives: true
-        });
-
-        let content = '';
-        const title = file.data.name;
-
-        switch (file.data.mimeType) {
-            case 'application/vnd.google-apps.document':
-                const doc = await drive.files.export({
-                    fileId,
-                    mimeType: 'text/plain',
-                    supportsAllDrives: true
-                });
-                content = doc.data;
-                break;
-            case 'application/vnd.google-apps.spreadsheet':
-                const sheet = await drive.files.export({ 
-                    fileId, 
-                    mimeType: 'text/csv',
-                    supportsAllDrives: true
-                });
-                
-                // Parse CSV content
-                const rows = sheet.data.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-                if (rows.length > 0) {
-                    const headers = rows[0];
-                    let spreadsheetContent = `[Spreadsheet: ${title}\n`;
-                    spreadsheetContent += `Columns: ${headers.join(', ')}\n\n`;
+            let content = '';
+            switch (file.data.mimeType) {
+                case 'application/vnd.google-apps.document':
+                    const doc = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = doc.data;
+                    break;
+                case 'application/vnd.google-apps.spreadsheet':
+                    const sheet = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/csv',
+                        supportsAllDrives: true
+                    });
                     
-                    // Process each row (skip header)
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (row.length === headers.length) {
-                            // Create a row object with headers
-                            const rowData = {};
-                            headers.forEach((header, index) => {
-                                rowData[header] = row[index];
-                            });
-                            
-                            // Generate summary for the row
-                            const rowSummary = await anthropic.messages.create({
-                                model: "claude-3-5-sonnet-20240620",
-                                max_tokens: 100,
-                                messages: [{
-                                    role: "user",
-                                    content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a Google Spreadsheet:\nSpreadsheet: ${title}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
-                                }]
-                            });
-                            
-                            spreadsheetContent += `${rowSummary.content[0].text}\n`;
+                    // Parse CSV content
+                    const rows = sheet.data.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+                    if (rows.length > 0) {
+                        const headers = rows[0];
+                        let spreadsheetContent = `[Spreadsheet: ${file.data.name}\n`;
+                        spreadsheetContent += `Columns: ${headers.join(', ')}\n\n`;
+                        
+                        // Process each row (skip header)
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (row.length === headers.length) {
+                                // Create a row object with headers
+                                const rowData = {};
+                                headers.forEach((header, index) => {
+                                    rowData[header] = row[index];
+                                });
+                                
+                                // Generate summary for the row
+                                const rowSummary = await anthropic.messages.create({
+                                    model: "claude-3-5-sonnet-20240620",
+                                    max_tokens: 100,
+                                    messages: [{
+                                        role: "user",
+                                        content: `Using the column titles as context, summarize this spreadsheet row in one concise sentence. Make sure to reference the column titles in your summary and mention this is from a Google Spreadsheet:\nSpreadsheet: ${file.data.name}\nColumns: ${headers.join(', ')}\nRow Data: ${JSON.stringify(rowData, null, 2)}`
+                                    }]
+                                });
+                                
+                                spreadsheetContent += `${rowSummary.content[0].text}\n`;
+                            }
                         }
+                        
+                        spreadsheetContent += `]\n`;
+                        content = spreadsheetContent;
                     }
-                    
-                    spreadsheetContent += `]\n`;
-                    content = spreadsheetContent;
-                }
-                break;
-            case 'application/vnd.google-apps.presentation':
-                const slides = await drive.files.export({ 
-                    fileId, 
-                    mimeType: 'text/plain',
-                    supportsAllDrives: true
-                });
-                content = slides.data;
-                break;
-            default:
-                // For non-Google Workspace files, try to get the file name and description
-                content = `File Name: ${title}\n`;
-                if (file.data.description) {
-                    content += `Description: ${file.data.description}\n`;
-                }
-                content += `Type: ${file.data.mimeType}\n`;
-                content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
+                    break;
+                case 'application/vnd.google-apps.presentation':
+                    const slides = await drive.files.export({ 
+                        fileId, 
+                        mimeType: 'text/plain',
+                        supportsAllDrives: true
+                    });
+                    content = slides.data;
+                    break;
+                default:
+                    // For non-Google Workspace files, try to get the file name and description
+                    content = `File Name: ${file.data.name}\n`;
+                    if (file.data.description) {
+                        content += `Description: ${file.data.description}\n`;
+                    }
+                    content += `Type: ${file.data.mimeType}\n`;
+                    content += 'Note: This file type cannot be directly exported. Please check the file in Google Drive.';
+            }
+            return content;
+        } catch (error) {
+            if (error.code === 404) {
+                return 'File not found or not accessible. Please check the file permissions in Google Drive.';
+            }
+            throw error;
         }
-
-        // Generate summary using Claude
-        const summary = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
-            max_tokens: 300,
-            messages: [{
-                role: "user",
-                content: `Summarize the key points from this Google Drive document in a concise paragraph:\n${content}`
-            }]
-        });
-
-        return {
-            content,
-            summary: summary.content[0].text,
-            title
-        };
     } catch (error) {
         console.error('Error processing Google Drive link:', error);
-        throw error;
+        return 'Unable to process Google Drive link. Please ensure the file is accessible and the link is correct.';
     }
 }
 
@@ -390,126 +369,87 @@ async function processExternalLink(url) {
             });
         } catch (navigationError) {
             console.log("Navigation error : ", navigationError);
-            await browser.close();
+            console.error('Navigation error:', navigationError);
             throw new Error(`Failed to load the webpage: ${navigationError.message}`);
         }
-
-        // Check for common error pages
-        const errorContent = await page.evaluate(() => {
-            const errorIndicators = [
-                'Application error',
-                'Error loading page',
-                'Page not found',
-                '404',
-                '500',
-                'Internal Server Error',
-                'Service Unavailable',
-                'Access Denied',
-                'Forbidden'
-            ];
-            
-            const pageText = document.body.innerText.toLowerCase();
-            const foundErrors = errorIndicators.filter(indicator => 
-                pageText.includes(indicator.toLowerCase())
-            );
-            
-            if (foundErrors.length > 0) {
-                return {
-                    isError: true,
-                    errorType: foundErrors[0],
-                    errorMessage: document.body.innerText.trim()
-                };
-            }
-            
-            return { isError: false };
-        });
-
-        if (errorContent.isError) {
-            await browser.close();
-            throw new Error(`Webpage returned an error: ${errorContent.errorType}. ${errorContent.errorMessage}`);
-        }
-
-        // Get page title
-        const title = await page.title();
-        if (!title || title.toLowerCase().includes('error') || title.toLowerCase().includes('not found')) {
-            await browser.close();
-            throw new Error(`Invalid page title detected: ${title}`);
-        }
-
+        
         // Find the section with highest text density
         const content = await page.evaluate(() => {
             console.log("Evaluating page : ", document.body.innerHTML);
             // Remove unwanted elements
-            const removeSelectors = [
+            const removeSelectors = [];
+            /*[
                 'script', 'style', 'nav', 'header', 'footer', 
                 'aside', 'iframe', 'noscript', 'svg', 'form',
                 'button', 'input', 'select', 'textarea'
-            ];
+            ];*/
             removeSelectors.forEach(selector => {
                 document.querySelectorAll(selector).forEach(el => el.remove());
             });
 
-            // Find the container with the most text
-            let bestContainer = null;
-            let maxTextLength = 0;
+            // Function to calculate text score of an element
+            function getTextScore(element) {
+                const text = element.textContent.trim();
+                if (!text) return 0;
+                
+                const rect = element.getBoundingClientRect();
+                const area = rect.width * rect.height;
+                if (area === 0) return 0;
+                
+                // Count words (rough estimate)
+                const wordCount = text.split(/\s+/).length;
+                
+                // Skip sections with less than 50 words
+                if (wordCount < 50) return 0;
+                
+                // Calculate density (words per pixel)
+                const density = wordCount / area;
+                
+                // Calculate length score (logarithmic scale to prevent extremely long texts from dominating)
+                const lengthScore = Math.log(wordCount + 1);
+                
+                // Combine density and length scores
+                // We multiply them to favor sections that are both dense and long
+                return density * lengthScore;
+            }
 
-            // Check all divs and articles
-            const containers = document.querySelectorAll('div, article, main, section');
+            // Get all potential content containers
+            const containers = Array.from(document.querySelectorAll('div, article, section, main'));
+            
+            // Find container with highest text score
+            let bestContainer = null;
+            let highestScore = 0;
+            
             containers.forEach(container => {
-                const text = container.innerText.trim();
-                if (text.length > maxTextLength) {
-                    maxTextLength = text.length;
+                const score = getTextScore(container);
+                if (score > highestScore) {
+                    highestScore = score;
                     bestContainer = container;
                 }
             });
 
-            // If no good container found, use body
-            if (!bestContainer) {
+            // If no good container found, try the body
+            if (!bestContainer || highestScore < 0.0001) {
                 bestContainer = document.body;
             }
 
             console.log("Best container : ", bestContainer);
 
             // Get the text content
-            const text = bestContainer.innerText.trim();
-            
-            // Check if we got meaningful content
-            if (!text || text.length < 50) {
-                return null;
-            }
-            
-            return text;
+            return bestContainer.textContent.trim();
         });
-
+        
         await browser.close();
-
-        if (!content) {
+        
+        if (!content || content.trim().length === 0) {
             throw new Error('No meaningful content found on the webpage');
         }
-
-        // Generate summary using Claude
-        const summary = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
-            max_tokens: 300,
-            messages: [{
-                role: "user",
-                content: `Summarize the key points from this webpage content in a concise paragraph:\n${content}`
-            }]
-        });
-
-        return {
-            content,
-            summary: summary.content[0].text,
-            title
-        };
+        
+        console.log("Content : ", content);
+        return content;
     } catch (error) {
         console.error('Error processing external link:', error);
-        // Return a more user-friendly error message
-        return {
-            content: `Error: ${error.message}`,
-            summary: `Unable to process this link: ${error.message}`,
-            title: 'Error Processing Link'
-        };
+        throw new Error(`Failed to process external link: ${error.message}`);
     }
 }
 
@@ -685,13 +625,79 @@ async function processPDF(url) {
     }
 }
 
-// Main link processing function
+// Process Granola.ai links
+async function processGranolaLink(url) {
+    try {
+        const browser = await chromium.launch();
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        
+        // Navigate to the URL
+        await page.goto(url);
+        
+        // Wait for the content to load
+        await page.waitForSelector('main', { timeout: 10000 });
+        
+        // Extract the content
+        const content = await page.evaluate(() => {
+            // Get all text content from the main element
+            const mainElement = document.querySelector('main');
+            if (!mainElement) return '';
+            
+            // Extract text while preserving structure
+            const extractText = (element) => {
+                let text = '';
+                for (const node of element.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        text += node.textContent;
+                    } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Add appropriate spacing for block elements
+                        if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
+                            text += '\n';
+                        }
+                        text += extractText(node);
+                        if (['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'].includes(node.tagName)) {
+                            text += '\n';
+                        }
+                    }
+                }
+                return text;
+            };
+            
+            return extractText(mainElement).trim();
+        });
+
+        await browser.close();
+
+        // Generate a summary using Claude
+        const summary = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 300,
+            messages: [{
+                role: "user",
+                content: `Summarize the key points from this Granola.ai content in a concise paragraph:\n${content}`
+            }]
+        });
+
+        return {
+            content: content,
+            summary: summary.content[0].text
+        };
+    } catch (error) {
+        console.error('Error processing Granola.ai link:', error);
+        throw error;
+    }
+}
+
+// Process link with enhanced file type detection
 async function processLink(url) {
     try {
         if (url.includes('notion.so')) {
             return await processNotionLink(url);
         } else if (url.includes('drive.google.com')) {
             return await processGoogleDriveLink(url);
+        } else if (url.includes('granola.ai')) {
+            return await processGranolaLink(url);
         } else {
             return await processExternalLink(url);
         }
