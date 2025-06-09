@@ -90,7 +90,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                 await slack.chat.postMessage({
                                     channel: channelId,
                                     thread_ts: message.thread_ts,
-                                    text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions."
+                                    text: "🔒 I don't have access to read this Google Drive file. Please make sure it's shared with `reclaim-ai-bot@reclaim-protocol-c6c62.iam.gserviceaccount.com` with viewer permissions. Once done, please share the link again so that I can learn from it."
                                 });
                             }
                             console.error(`Error processing link ${link}:`, error);
