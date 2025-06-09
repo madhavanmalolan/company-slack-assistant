@@ -356,99 +356,121 @@ async function processGoogleDriveLink(url) {
 
 // Process external website links
 async function processExternalLink(url) {
-    console.log("Processing external link : ", url);
     try {
         const browser = await chromium.launch();
-        const context = await browser.newContext();
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        });
         const page = await context.newPage();
         
+        // Set a longer timeout for page load
+        page.setDefaultTimeout(30000);
+        
         try {
+            // Navigate to the page and wait for network to be idle
             await page.goto(url, { 
-                waitUntil: 'networkidle',
-                timeout: 30000 // 30 second timeout
+                waitUntil: ['networkidle0', 'domcontentloaded'],
+                timeout: 30000 
             });
+            
+            // Wait for any dynamic content to load
+            await page.waitForTimeout(5000);
+            
+            // Wait for the page to be fully rendered
+            await page.evaluate(() => {
+                return new Promise((resolve) => {
+                    if (document.readyState === 'complete') {
+                        resolve();
+                    } else {
+                        window.addEventListener('load', resolve);
+                    }
+                });
+            });
+            
+            // Additional wait for any client-side rendering
+            await page.waitForFunction(() => {
+                return document.readyState === 'complete' && 
+                       !document.querySelector('.loading') && 
+                       !document.querySelector('.spinner');
+            }, { timeout: 10000 });
+            
+            // Find the section with highest text density
+            const content = await page.evaluate(() => {
+                // Remove unwanted elements
+                const removeSelectors = [
+                    'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
+                    'aside', 'form', 'button', 'input', 'select', 'textarea',
+                    '[role="navigation"]', '[role="banner"]', '[role="complementary"]',
+                    '[role="contentinfo"]', '[role="form"]', '[role="search"]',
+                    '.ad', '.advertisement', '.banner', '.cookie-banner', '.popup',
+                    '.modal', '.overlay', '.sidebar', '.menu', '.navigation',
+                    '.header', '.footer', '.comments', '.social-share', '.related-posts'
+                ];
+                
+                // Create a clone of the body to work with
+                const bodyClone = document.body.cloneNode(true);
+                
+                // Remove unwanted elements from the clone
+                removeSelectors.forEach(selector => {
+                    const elements = bodyClone.querySelectorAll(selector);
+                    elements.forEach(el => el.remove());
+                });
+                
+                // Find the main content container
+                let bestContainer = null;
+                let maxDensity = 0;
+                
+                // Common content container selectors
+                const contentSelectors = [
+                    'main', 'article', '.content', '#content', '.post', '.article',
+                    '.main-content', '.entry-content', '.post-content', '.article-content',
+                    '[role="main"]', '.container', '.wrapper'
+                ];
+                
+                // Try to find the main content container
+                for (const selector of contentSelectors) {
+                    const container = bodyClone.querySelector(selector);
+                    if (container) {
+                        const text = container.textContent.trim();
+                        const words = text.split(/\s+/).length;
+                        const density = words / container.textContent.length;
+                        
+                        if (density > maxDensity) {
+                            maxDensity = density;
+                            bestContainer = container;
+                        }
+                    }
+                }
+                
+                // If no suitable container found, use the body
+                if (!bestContainer) {
+                    bestContainer = bodyClone;
+                }
+                
+                // Get the text content
+                let text = bestContainer.textContent
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                
+                // Clean up the text
+                text = text
+                    .replace(/\n\s*\n/g, '\n') // Remove multiple newlines
+                    .replace(/\t/g, ' ') // Replace tabs with spaces
+                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                    .trim();
+                
+                return text;
+            });
+            
+            await browser.close();
+            return content;
         } catch (navigationError) {
-            console.log("Navigation error : ", navigationError);
-            console.error('Navigation error:', navigationError);
+            await browser.close();
             throw new Error(`Failed to load the webpage: ${navigationError.message}`);
         }
-        
-        // Find the section with highest text density
-        const content = await page.evaluate(() => {
-            console.log("Evaluating page : ", document.body.innerHTML);
-            // Remove unwanted elements
-            const removeSelectors = [
-                'script', 'style', 'nav', 'header', 'footer', 
-                'aside', 'iframe', 'noscript', 'svg', 'form',
-                'button', 'input', 'select', 'textarea'
-            ];
-            removeSelectors.forEach(selector => {
-                document.querySelectorAll(selector).forEach(el => el.remove());
-            });
-
-            // Function to calculate text score of an element
-            function getTextScore(element) {
-                const text = element.textContent.trim();
-                if (!text) return 0;
-                
-                const rect = element.getBoundingClientRect();
-                const area = rect.width * rect.height;
-                if (area === 0) return 0;
-                
-                // Count words (rough estimate)
-                const wordCount = text.split(/\s+/).length;
-                
-                // Skip sections with less than 50 words
-                if (wordCount < 50) return 0;
-                
-                // Calculate density (words per pixel)
-                const density = wordCount / area;
-                
-                // Calculate length score (logarithmic scale to prevent extremely long texts from dominating)
-                const lengthScore = Math.log(wordCount + 1);
-                
-                // Combine density and length scores
-                // We multiply them to favor sections that are both dense and long
-                return density * lengthScore;
-            }
-
-            // Get all potential content containers
-            const containers = Array.from(document.querySelectorAll('div, article, section, main'));
-            
-            // Find container with highest text score
-            let bestContainer = null;
-            let highestScore = 0;
-            
-            containers.forEach(container => {
-                const score = getTextScore(container);
-                if (score > highestScore) {
-                    highestScore = score;
-                    bestContainer = container;
-                }
-            });
-
-            // If no good container found, try the body
-            if (!bestContainer || highestScore < 0.0001) {
-                bestContainer = document.body;
-            }
-
-            console.log("Best container : ", bestContainer);
-
-            // Get the text content
-            return bestContainer.textContent.trim();
-        });
-        
-        await browser.close();
-        
-        if (!content || content.trim().length === 0) {
-            throw new Error('No meaningful content found on the webpage');
-        }
-        
-        console.log("Content : ", content);
-        return content;
     } catch (error) {
         console.error('Error processing external link:', error);
-        throw new Error(`Failed to process external link: ${error.message}`);
+        throw error;
     }
 }
 
