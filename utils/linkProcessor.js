@@ -44,6 +44,7 @@ async function processNotionLink(url) {
         const pageId = url.split('-').pop().split('?')[0].replace(">", "").replace("<", "");
         try {
             const page = await notion.pages.retrieve({ page_id: pageId });
+            const title = page.properties.title?.title[0]?.plain_text || 'Untitled';
             const blocks = await notion.blocks.children.list({ block_id: pageId });
             
             let content = '';
@@ -235,7 +236,7 @@ async function processNotionLink(url) {
                     }
                 }
             }
-            return content;
+            return title + " : " + content;
         } catch (apiError) {
             if (apiError.code === 'unauthorized' || apiError.message.includes('API token is invalid')) {
                 throw new Error('Notion API authentication failed. Please check the API key configuration.');
@@ -361,6 +362,9 @@ async function processExternalLink(url) {
         const browser = await chromium.launch();
         const context = await browser.newContext();
         const page = await context.newPage();
+        const title = await page.evaluate(() => {
+            return document.querySelector('title').textContent;
+        });
         
         try {
             await page.goto(url, { 
@@ -446,7 +450,7 @@ async function processExternalLink(url) {
         }
         
         console.log("Content : ", content);
-        return content;
+        return title + " : " + content;
     } catch (error) {
         console.error('Error processing external link:', error);
         throw new Error(`Failed to process external link: ${error.message}`);
@@ -637,6 +641,9 @@ async function processGranolaLink(url) {
         
         // Wait for the content to load
         await page.waitForSelector('main', { timeout: 10000 });
+        const title = await page.evaluate(() => {
+            return document.querySelector('title').textContent;
+        });
         
         // Extract the content
         const content = await page.evaluate(() => {
@@ -675,13 +682,13 @@ async function processGranolaLink(url) {
             max_tokens: 300,
             messages: [{
                 role: "user",
-                content: `Summarize the key points from this Granola.ai content in a concise paragraph:\n${content}`
+                content: `Summarize the key points from this content in a concise paragraph:\n${content}`
             }]
         });
 
         return {
             content: content,
-            summary: summary.content[0].text
+            summary: title + " : " + summary.content[0].text
         };
     } catch (error) {
         console.error('Error processing Granola.ai link:', error);
