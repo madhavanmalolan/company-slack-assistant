@@ -451,6 +451,13 @@ router.post('/', async (req, res) => {
                 }
 
                 console.log("Summary text : ", summaryText);
+                if(summaryText) {
+                    await slack.chat.postMessage({
+                        channel: event.channel,
+                        thread_ts: event.ts,
+                        blocks: formatMessageWithBlocks(summaryText)
+                    });
+                }
 
                 event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 
