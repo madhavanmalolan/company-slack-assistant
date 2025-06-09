@@ -183,9 +183,11 @@ const processIncomingMessagePayload = async (event, req) => {
 
 // Function to format message with blocks
 function formatMessageWithBlocks(text) {
+    const MAX_BLOCK_TEXT_LENGTH = 3000;
+    const blocks = [];
+    
     // Split text into sections based on markdown headers
     const sections = text.split(/(?=^|\n)(#{1,6}\s.*$)/m);
-    const blocks = [];
     
     for (const section of sections) {
         if (!section.trim()) continue;
@@ -227,13 +229,33 @@ function formatMessageWithBlocks(text) {
         // Convert markdown links
         processedText = processedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>');
         
-        blocks.push({
-            type: "section",
-            text: {
-                type: "mrkdwn",
-                text: processedText
+        // Split long text into chunks that fit within Slack's block text limit
+        while (processedText.length > 0) {
+            let chunk = processedText;
+            if (chunk.length > MAX_BLOCK_TEXT_LENGTH) {
+                // Find the last space before the limit
+                const lastSpace = chunk.lastIndexOf(' ', MAX_BLOCK_TEXT_LENGTH);
+                if (lastSpace === -1) {
+                    // If no space found, force split at the limit
+                    chunk = chunk.substring(0, MAX_BLOCK_TEXT_LENGTH);
+                    processedText = processedText.substring(MAX_BLOCK_TEXT_LENGTH);
+                } else {
+                    // Split at the last space
+                    chunk = chunk.substring(0, lastSpace);
+                    processedText = processedText.substring(lastSpace + 1);
+                }
+            } else {
+                processedText = '';
             }
-        });
+            
+            blocks.push({
+                type: "section",
+                text: {
+                    type: "mrkdwn",
+                    text: chunk
+                }
+            });
+        }
     }
     
     return blocks;
