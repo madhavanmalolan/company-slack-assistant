@@ -132,8 +132,10 @@ async function processMessageContent(message, channelId, channelName, channelDes
 
         // Process any links in the message
         const links = extractLinks(message.text);
+        console.log("Links extracted: ", links.length);
         if (links.length > 0) {
             for (const link of links) {
+                console.log("Processing extracted link: ", link);
                 try {
                     const { content, summary } = await processLink(link);
                     storable += `
@@ -363,7 +365,6 @@ router.post('/', async (req, res) => {
                 });
                 console.log('Processing tagged message...');
                 const taggedMessage = await processIncomingMessagePayload(event, req);
-                console.log('Tagged message:', taggedMessage.substring(0, 40));
                 
                 // Process any links in the message
                 let linkSummaryText = "";
