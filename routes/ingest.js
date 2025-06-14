@@ -173,6 +173,7 @@ async function processMessage(message, channelId, channelName, channelDescriptio
     if (storable) {
         // Get user info
         console.log("Storing : ", storable);
+        console.log("message : ", message);
         const userInfo = await slack.users.info({ user: message.user });
         const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : message.user;
         const senderTitle = userInfo.user.profile.title || 'No title';
