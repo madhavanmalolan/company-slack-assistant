@@ -304,10 +304,10 @@ router.post('/', async (req, res) => {
                     const channelInfo = await slack.conversations.info({ channel: event.channel });
                     
                     // Send welcome message
-                    await slack.chat.postMessage({
+                    /*await slack.chat.postMessage({
                         channel: event.channel,
                         blocks: formatMessageWithBlocks("Yay! I'm now in the channel! I will start learning from everything shared in this channel!")
-                    });
+                    });*/
 
                     // Process historical messages
                     console.log('Processing historical messages...');
