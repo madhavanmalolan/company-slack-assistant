@@ -159,7 +159,7 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 }
             }
         }
-
+        console.log("Storable : ", storable);
         return storable;
     } catch (error) {
         console.error('Error processing message content:', error);
@@ -334,7 +334,6 @@ router.post('/', async (req, res) => {
                         for (const message of result.messages) {
                             try {
                                 console.log('Processing message:', message.text);
-                                console.log("Processing message : ", message);
                                 await processMessage(
                                     message,
                                     event.channel,
