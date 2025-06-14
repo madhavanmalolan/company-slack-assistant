@@ -142,10 +142,8 @@ async function processMessageContent(message, channelId, channelName, channelDes
 
         // Process any links in the message
         const links = extractLinks(message.text);
-        console.log("Links extracted: ", links.length);
         if (links.length > 0) {
             for (const link of links) {
-                console.log("Processing extracted link: ", link);
                 try {
                     const { content, summary } = await processLink(link);
                     storable += `
@@ -159,7 +157,6 @@ async function processMessageContent(message, channelId, channelName, channelDes
                 }
             }
         }
-        console.log("Storable : ", storable);
         return storable;
     } catch (error) {
         console.error('Error processing message content:', error);
@@ -172,12 +169,8 @@ async function processMessage(message, channelId, channelName, channelDescriptio
     const storable = await processMessageContent(message, channelId, channelName, channelDescription, channelTopic);
     if (storable) {
         // Get user info
-        console.log("Storing : ", storable);
-        console.log("message : ", message);
-        const userInfo = await slack.users.info({ user: message.user });
-        const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : message.user;
-        const senderTitle = userInfo.user.profile.title || 'No title';
-        await chunkAndStoreMessage(channelId, message.thread_ts || message.ts, storable, senderName, senderTitle, message.ts);
+        const senderName = message.username || "Team Member";
+        await chunkAndStoreMessage(channelId, message.thread_ts || message.ts, storable, senderName, "", message.ts);
     }
 }
 
@@ -528,7 +521,6 @@ router.post('/', async (req, res) => {
                 return;
 
             default:
-                console.log("Processing incoming message payload : ", JSON.stringify(event));
 
                 let fileSummaryText = "";
                 // Process files in the message
@@ -583,7 +575,6 @@ router.post('/', async (req, res) => {
                     }
                 }
 
-                console.log("Summary text : ", summaryText);
 
                 event.text = event.text + "\n\n" + summaryText + "\n\n" + fileSummaryText;
 

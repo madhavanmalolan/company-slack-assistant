@@ -176,7 +176,6 @@ async function chunkAndStoreMessage(channelName, threadTs, content, userName, us
     
     // Store each chunk with metadata
     for (const chunk of chunks) {
-        console.log("Storing chunk : ", chunk);
         await storeMessage(
             channelName,
             threadTs,
