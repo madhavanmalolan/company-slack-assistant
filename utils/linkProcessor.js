@@ -43,11 +43,9 @@ async function processNotionLink(url) {
 
         const pageId = url.split('-').pop().split('?')[0].replace(">", "").replace("<", "");
         try {
-            console.log("Processing Notion link : ", url);
             const page = await notion.pages.retrieve({ page_id: pageId });
             const title = page.properties.title?.title[0]?.plain_text || 'Untitled';
             const blocks = await notion.blocks.children.list({ block_id: pageId });
-            console.log("title : ", title);
             
             let content = '';
             for (const block of blocks.results) {
@@ -360,7 +358,6 @@ async function processGoogleDriveLink(url) {
 
 // Process external website links
 async function processExternalLink(url) {
-    console.log("Processing external link : ", url);
     try {
         const browser = await chromium.launch();
         const context = await browser.newContext();
@@ -375,14 +372,12 @@ async function processExternalLink(url) {
                 timeout: 30000 // 30 second timeout
             });
         } catch (navigationError) {
-            console.log("Navigation error : ", navigationError);
             console.error('Navigation error:', navigationError);
             throw new Error(`Failed to load the webpage: ${navigationError.message}`);
         }
         
         // Find the section with highest text density
         const content = await page.evaluate(() => {
-            console.log("Evaluating page : ", document.body.innerHTML);
             // Remove unwanted elements
             const removeSelectors = [];
             /*[
@@ -439,9 +434,6 @@ async function processExternalLink(url) {
             if (!bestContainer || highestScore < 0.0001) {
                 bestContainer = document.body;
             }
-
-            console.log("Best container : ", bestContainer);
-
             // Get the text content
             return bestContainer.textContent.trim();
         });
@@ -650,13 +642,11 @@ async function processGranolaLink(url) {
         const browser = await chromium.launch();
         const context = await browser.newContext();
         const page = await context.newPage();
-        console.log("Navigating to URL : ", url);
         // Navigate to the URL and wait for network idle
         await page.goto(url, { 
             waitUntil: 'networkidle0',
             timeout: 10000 // 10 second timeout
         });
-        console.log("Navigated to URL : ", url);
         // Try to get the title first
         let title = 'Untitled';
         try {
@@ -666,10 +656,8 @@ async function processGranolaLink(url) {
         } catch (titleError) {
             console.warn('Error getting page title:', titleError);
         }
-        console.log("Title : ", title);
         // Extract the content
         let content = await page.evaluate(() => document.body.innerHTML);
-        console.log("Content : ", content);
         
         await browser.close();
 
@@ -699,6 +687,7 @@ async function processGranolaLink(url) {
 
 // Process link with enhanced file type detection
 async function processLink(url) {
+    console.log("Processing link : ", url);
     try {
         if (url.includes('notion.so')) {
             return await processNotionLink(url);

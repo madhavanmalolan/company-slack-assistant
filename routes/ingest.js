@@ -84,7 +84,6 @@ async function processMessageContent(message, channelId, channelName, channelDes
                                 Content : ${content}
                             `;
                         } catch (error) {
-                            console.log("Error : ", error);
                             if (error.message.includes('Google Drive')) {
                                 // Post a message to the thread requesting permissions
                                 await slack.chat.postMessage({
@@ -352,8 +351,7 @@ router.post('/', async (req, res) => {
             case 'group_left':
             case 'member_left_channel':
             case 'channel_left':
-                const deleted = await deleteChannelMessages(event.channel);
-                console.log(`Deleted ${deleted} messages from channel: ${event.channel}`);
+                await deleteChannelMessages(event.channel);
                 return;
 
             case 'app_mention':
