@@ -14,6 +14,14 @@ const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY
 });
 
+function getCanonicalMessageText(message) {
+    let text = message.text;
+    if(text.includes("Granola")) {
+        text += `\n ${message.attachments[0].original_url}`;
+    }
+    return text;
+}
+
 // Shared function to process message content
 async function processMessageContent(message, channelId, channelName, channelDescription, channelTopic) {
     try {
@@ -21,6 +29,8 @@ async function processMessageContent(message, channelId, channelName, channelDes
         if (message.user === process.env.SLACK_BOT_ID) {
             return null;
         }
+
+        message.text = getCanonicalMessageText(message);
 
         // Get thread info if it exists
         let threadContent = '';

@@ -26,7 +26,7 @@ const auth = new google.auth.GoogleAuth({
 const drive = google.drive({ version: 'v3', auth });
 
 // Helper function to extract links from text
-function extractLinks(text) {
+function extractLinks(text, attachments) {
     if(!text) {
         return [];
     }
