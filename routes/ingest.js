@@ -324,6 +324,7 @@ router.post('/', async (req, res) => {
                         for (const message of result.messages) {
                             try {
                                 console.log('Processing message:', message.text);
+                                console.log("Processing message : ", message);
                                 await processMessage(
                                     message,
                                     event.channel,
