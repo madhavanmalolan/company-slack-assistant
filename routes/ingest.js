@@ -339,12 +339,14 @@ router.post('/', async (req, res) => {
                             } catch (error) {
                                 console.error('Error processing message:', error);
                             }
+                            // Sleep for 2 minute between messages to avoid rate limits
+                            await new Promise(resolve => setTimeout(resolve, 120000));
                             processedCount++;
                         }
 
                         cursor = result.response_metadata?.next_cursor;
-                        // Sleep for 1 minute between batches to avoid rate limits
-                        await new Promise(resolve => setTimeout(resolve, 60000));
+                        // Sleep for 10 minutes between batches to avoid rate limits
+                        await new Promise(resolve => setTimeout(resolve, 600000));
                     } while (cursor && processedCount < 500);
 
                     console.log(`Processed ${processedCount} historical messages`);
