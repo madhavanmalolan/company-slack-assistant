@@ -280,24 +280,9 @@ function formatMessageWithBlocks(text) {
 router.post('/', async (req, res) => {
     try {
         res.status(200).send('Message received');
-        const messageText = req.body.event.text;
         const channelId = req.body.event.channel;
         const threadTs = req.body.event.thread_ts || req.body.event.ts;
-        const userId = req.body.event.user;
-        const unfurledLinks = req.body.event.links || [];
         
-        // Get user info
-        const userInfo = await slack.users.info({ user: userId });
-        const senderName = userInfo.user ? (userInfo.user.real_name || userInfo.user.name) : userId;
-        const senderTitle = userInfo.user.profile.title || 'No title';
-        const senderEmail = userInfo.user.profile.email;
-
-        // Get channel info
-        const channelInfo = await slack.conversations.info({ channel: channelId });
-        const channelName = channelInfo.channel.name;
-        const channelDescription = channelInfo.channel.purpose?.value || 'No description';
-        const channelTopic = channelInfo.channel.topic?.value || 'No topic';
-
         const event = req.body.event;
 
         console.log('Processing event:', event.type);
