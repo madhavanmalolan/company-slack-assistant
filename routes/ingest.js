@@ -17,7 +17,9 @@ const anthropic = new Anthropic({
 function getCanonicalMessageText(message) {
     let text = message.text;
     if(text.includes("Granola")) {
-        text += `\n ${message.attachments[0].original_url}`;
+        if(message.attachments) {
+            text += `\n ${message.attachments[0].original_url}`;
+        }
     }
     return text;
 }
